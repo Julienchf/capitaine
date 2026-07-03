@@ -84,8 +84,9 @@ export function sum(expenses: Expense[]): number {
   return expenses.reduce((t, e) => t + e.amount, 0);
 }
 
-/** A treatment is active if today is within its start/end window. */
+/** A treatment is active if today is within its window AND it wasn't stopped. */
 export function isTreatmentActive(t: Treatment): boolean {
+  if (t.stopReason) return false; // explicitly stopped → archived immediately
   const today = todayISO();
   if (t.startDate > today) return false;
   if (t.endDate && t.endDate < today) return false;
