@@ -14,12 +14,12 @@ create table if not exists public.household (
 -- 2. Sécurité au niveau des lignes
 alter table public.household enable row level security;
 
--- 3. Liste des comptes autorisés (Julien + Auriane)
+-- 3. Liste des comptes autorisés — remplace par les emails réels
 create or replace function public.is_member() returns boolean
 language sql stable as $$
   select (auth.jwt() ->> 'email') in (
-    'julien.chamboeuf@gmail.com',
-    'plague.auriane@gmail.com'
+    'proprietaire-1@exemple.com',
+    'proprietaire-2@exemple.com'
   )
 $$;
 
