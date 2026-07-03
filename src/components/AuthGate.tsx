@@ -35,27 +35,46 @@ function AuthedApp({ children }: { children: React.ReactNode }) {
   return <>{children}</>;
 }
 
+function frError(m: string): string {
+  const s = m.toLowerCase();
+  if (s.includes("invalid login")) return "Email ou mot de passe incorrect.";
+  if (s.includes("already registered") || s.includes("already been registered"))
+    return "Ce compte existe déjà — connecte-toi.";
+  if (s.includes("at least") || s.includes("password should"))
+    return "Mot de passe : au moins 6 caractères.";
+  if (s.includes("email not confirmed"))
+    return "Email non confirmé — désactive « Confirm email » dans Supabase.";
+  return m;
+}
+
 function Login() {
+  const [mode, setMode] = useState<"signin" | "signup">("signin");
   const [email, setEmail] = useState("");
-  const [sent, setSent] = useState(false);
+  const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
 
-  async function send() {
-    if (!email.trim()) return;
+  async function submit() {
+    const em = email.trim();
+    if (!em || !password) return;
     setLoading(true);
     setError("");
-    const { error } = await supabase!.auth.signInWithOtp({
-      email: email.trim(),
-      options: { emailRedirectTo: window.location.origin },
-    });
+    setInfo("");
+    if (mode === "signin") {
+      const { error } = await supabase!.auth.signInWithPassword({ email: em, password });
+      if (error) setError(frError(error.message));
+    } else {
+      const { data, error } = await supabase!.auth.signUp({ email: em, password });
+      if (error) setError(frError(error.message));
+      else if (!data.session)
+        setInfo("Compte créé. La confirmation par email est encore activée dans Supabase — désactive « Confirm email », puis connecte-toi.");
+    }
     setLoading(false);
-    if (error) setError(error.message);
-    else setSent(true);
   }
 
   return (
-    <div className="page" style={{ maxWidth: 360, margin: "0 auto", paddingTop: 64, textAlign: "center" }}>
+    <div className="page" style={{ maxWidth: 360, margin: "0 auto", paddingTop: 56, textAlign: "center" }}>
       <div
         style={{
           width: 72, height: 72, borderRadius: 20, background: "var(--accent)", color: "#fff",
@@ -66,42 +85,46 @@ function Login() {
       </div>
       <h1 style={{ fontSize: 26 }}>Capitaine</h1>
       <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 6, marginBottom: 24 }}>
-        Le carnet de bord partagé de Capitaine.
+        {mode === "signin" ? "Connecte-toi pour retrouver Capitaine." : "Crée ton compte (une seule fois)."}
       </p>
 
-      {sent ? (
-        <div className="card card-pad" style={{ textAlign: "left" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-            <span style={{ color: "var(--ok)" }}><Icon name="check" size={20} /></span>
-            <strong style={{ fontSize: 15 }}>Lien envoyé</strong>
-          </div>
-          <p style={{ fontSize: 14, color: "var(--muted)", margin: 0, lineHeight: 1.5 }}>
-            Ouvre l'email envoyé à <b>{email}</b> et clique sur le lien pour te connecter.
-          </p>
-        </div>
-      ) : (
-        <>
-          <div className="field" style={{ marginTop: 0, textAlign: "left" }}>
-            <label>Ton adresse email</label>
-            <input
-              type="email"
-              inputMode="email"
-              autoComplete="email"
-              placeholder="prenom@email.com"
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && send()}
-            />
-          </div>
-          {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 8 }}>{error}</p>}
-          <button className="btn primary block" style={{ marginTop: 16 }} onClick={send} disabled={loading}>
-            {loading ? "Envoi…" : "Recevoir mon lien de connexion"}
-          </button>
-          <p style={{ fontSize: 12.5, color: "var(--faint)", marginTop: 14, lineHeight: 1.5 }}>
-            Pas de mot de passe : on t'envoie un lien magique par email.
-          </p>
-        </>
-      )}
+      <div className="field" style={{ marginTop: 0, textAlign: "left" }}>
+        <label>Adresse email</label>
+        <input
+          type="email"
+          inputMode="email"
+          autoComplete="email"
+          placeholder="prenom@email.com"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+        />
+      </div>
+      <div className="field" style={{ textAlign: "left" }}>
+        <label>Mot de passe</label>
+        <input
+          type="password"
+          autoComplete={mode === "signin" ? "current-password" : "new-password"}
+          placeholder={mode === "signup" ? "au moins 6 caractères" : "••••••••"}
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && submit()}
+        />
+      </div>
+
+      {error && <p style={{ color: "var(--danger)", fontSize: 13, marginTop: 10 }}>{error}</p>}
+      {info && <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 10, lineHeight: 1.5 }}>{info}</p>}
+
+      <button className="btn primary block" style={{ marginTop: 16 }} onClick={submit} disabled={loading}>
+        {loading ? "…" : mode === "signin" ? "Se connecter" : "Créer le compte"}
+      </button>
+
+      <button
+        className="btn ghost block"
+        style={{ marginTop: 8, color: "var(--muted)" }}
+        onClick={() => { setMode(mode === "signin" ? "signup" : "signin"); setError(""); setInfo(""); }}
+      >
+        {mode === "signin" ? "Première fois ? Créer un compte" : "Déjà un compte ? Se connecter"}
+      </button>
     </div>
   );
 }
