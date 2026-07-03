@@ -38,3 +38,21 @@ create policy "members update" on public.household
 
 -- 5. Activer le temps réel (pour que les changements de l'un apparaissent chez l'autre)
 alter publication supabase_realtime add table public.household;
+
+-- 6. Lien de partage public (fiche en lecture seule pour la dogsitter)
+create table if not exists public.shares (
+  id uuid primary key,
+  data jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table public.shares enable row level security;
+
+-- Lecture publique : quiconque possède le lien (l'id UUID, non devinable) peut lire.
+drop policy if exists "public read shares" on public.shares;
+create policy "public read shares" on public.shares
+  for select using (true);
+
+-- Écriture (créer / mettre à jour / supprimer) réservée aux membres.
+drop policy if exists "members write shares" on public.shares;
+create policy "members write shares" on public.shares
+  for all using (public.is_member()) with check (public.is_member());

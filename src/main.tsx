@@ -10,11 +10,19 @@ import Budget from "./pages/Budget";
 import Rappels from "./pages/Rappels";
 import Partage from "./pages/Partage";
 import Profil from "./pages/Profil";
+import PublicShare from "./pages/PublicShare";
 
 const router = createBrowserRouter([
+  // Public read-only share link — no login required.
+  { path: "/s/:token", element: <PublicShare /> },
+  // Main app — gated behind authentication.
   {
     path: "/",
-    element: <App />,
+    element: (
+      <AuthGate>
+        <App />
+      </AuthGate>
+    ),
     children: [
       { index: true, element: <Home /> },
       { path: "sante", element: <Sante /> },
@@ -28,8 +36,6 @@ const router = createBrowserRouter([
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <AuthGate>
-      <RouterProvider router={router} />
-    </AuthGate>
+    <RouterProvider router={router} />
   </StrictMode>,
 );

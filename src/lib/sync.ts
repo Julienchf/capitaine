@@ -1,6 +1,7 @@
 import type { AppData } from "./types";
 import { supabase, HOUSEHOLD_ID } from "./supabase";
 import { applyRemote, getData, setPushHandler } from "./store";
+import { shareSnapshot } from "./share";
 
 const TABLE = "household";
 
@@ -59,6 +60,28 @@ async function pushNow(d: AppData): Promise<void> {
     .from(TABLE)
     .upsert({ id: HOUSEHOLD_ID, data: d, updated_at: new Date().toISOString() });
   if (error) console.warn("Sync: push failed", error.message);
+  // Keep the public share snapshot in sync too, if a link exists.
+  if (d.shareToken) await publishShare();
+}
+
+/** Publish (or refresh) the public read-only snapshot for the current share token. */
+export async function publishShare(): Promise<boolean> {
+  if (!supabase) return false;
+  const d = getData();
+  if (!d.shareToken) return false;
+  const { error } = await supabase
+    .from("shares")
+    .upsert({ id: d.shareToken, data: shareSnapshot(d), updated_at: new Date().toISOString() });
+  if (error) {
+    console.warn("Share: publish failed", error.message);
+    return false;
+  }
+  return true;
+}
+
+export async function revokeShare(token: string): Promise<void> {
+  if (!supabase) return;
+  await supabase.from("shares").delete().eq("id", token);
 }
 
 export function stopSync() {

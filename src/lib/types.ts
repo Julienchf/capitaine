@@ -154,6 +154,8 @@ export interface AppData {
   expenses: Expense[];
   stock: StockItem[];
   questions: VetQuestion[];
+  /** Token of the public read-only share link (if generated). */
+  shareToken?: string;
 }
 
 export const CARE_META: Record<
