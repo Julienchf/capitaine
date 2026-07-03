@@ -3,7 +3,8 @@ import Icon from "../components/Icon";
 import Sheet from "../components/Sheet";
 import { useData, update, uid } from "../lib/store";
 import { stockStatus } from "../lib/selectors";
-import type { StockItem } from "../lib/types";
+import type { StockItem, StockKind } from "../lib/types";
+import { STOCK_META } from "../lib/types";
 import { todayISO } from "../lib/dates";
 
 export default function Rappels() {
@@ -32,8 +33,8 @@ export default function Rappels() {
             s.daysLeft < 0 ? "épuisé" : s.daysLeft === 0 ? "aujourd'hui" : `~${s.daysLeft} j`;
           return (
             <div className="row" key={item.id} style={{ marginBottom: 8 }}>
-              <div className={`ic-badge ${item.kind === "croquettes" ? "ic-warning" : "ic-accent"}`}>
-                <Icon name={item.kind === "croquettes" ? "bowl" : "bone"} size={20} />
+              <div className={`ic-badge ${STOCK_META[item.kind].iconClass}`}>
+                <Icon name={STOCK_META[item.kind].icon as Parameters<typeof Icon>[0]["name"]} size={20} />
               </div>
               <div className="grow" style={{ cursor: "pointer" }} onClick={() => setEditStock(item)}>
                 <div className="title">{item.name}</div>
@@ -77,7 +78,7 @@ export default function Rappels() {
 
 function StockSheet({ item, onClose }: { item: StockItem | null; onClose: () => void }) {
   const [name, setName] = useState(item?.name ?? "");
-  const [kind, setKind] = useState<StockItem["kind"]>(item?.kind ?? "croquettes");
+  const [kind, setKind] = useState<StockKind>(item?.kind ?? "croquettes");
   const [durationDays, setDurationDays] = useState(String(item?.durationDays ?? 30));
   const [lastRestock, setLastRestock] = useState(item?.lastRestock ?? todayISO());
 
@@ -114,12 +115,11 @@ function StockSheet({ item, onClose }: { item: StockItem | null; onClose: () => 
       <div className="field">
         <label>Type</label>
         <div className="chips">
-          <button type="button" className={`chip ${kind === "croquettes" ? "on" : ""}`} onClick={() => setKind("croquettes")}>
-            🥣 Croquettes
-          </button>
-          <button type="button" className={`chip ${kind === "friandises" ? "on" : ""}`} onClick={() => setKind("friandises")}>
-            🦴 Friandises
-          </button>
+          {(Object.keys(STOCK_META) as StockKind[]).map((k) => (
+            <button key={k} type="button" className={`chip ${kind === k ? "on" : ""}`} onClick={() => setKind(k)}>
+              {STOCK_META[k].emoji} {STOCK_META[k].label}
+            </button>
+          ))}
         </div>
       </div>
       <div className="field">

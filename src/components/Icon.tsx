@@ -28,7 +28,8 @@ type IconName =
   | "search"
   | "edit"
   | "mail"
-  | "clock";
+  | "clock"
+  | "bag";
 
 const paths: Record<IconName, React.ReactNode> = {
   home: <path d="M3 10.5 12 3l9 7.5M5 9.5V20h14V9.5" />,
@@ -149,6 +150,12 @@ const paths: Record<IconName, React.ReactNode> = {
     <>
       <circle cx="12" cy="12" r="9" />
       <path d="M12 7v5l3 2" />
+    </>
+  ),
+  bag: (
+    <>
+      <path d="M6 8h12l-1 12H7L6 8Z" />
+      <path d="M9 8V6a3 3 0 0 1 6 0v2" />
     </>
   ),
 };

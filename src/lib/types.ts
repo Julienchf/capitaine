@@ -43,13 +43,22 @@ export interface Expense {
   label?: string;
 }
 
+export type StockKind = "croquettes" | "friandises" | "sacs" | "autre";
+
 export interface StockItem {
   id: string;
   name: string;
-  kind: "croquettes" | "friandises";
+  kind: StockKind;
   lastRestock: string; // ISO date
   durationDays: number; // how long one restock is expected to last
 }
+
+export const STOCK_META: Record<StockKind, { label: string; emoji: string; icon: string; iconClass: string }> = {
+  croquettes: { label: "Croquettes", emoji: "🥣", icon: "bowl", iconClass: "ic-warning" },
+  friandises: { label: "Friandises", emoji: "🦴", icon: "bone", iconClass: "ic-accent" },
+  sacs: { label: "Sacs à caca", emoji: "💩", icon: "bag", iconClass: "ic-muted" },
+  autre: { label: "Autre", emoji: "📦", icon: "box", iconClass: "ic-muted" },
+};
 
 export interface VetQuestion {
   id: string;

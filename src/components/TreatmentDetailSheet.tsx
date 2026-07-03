@@ -1,10 +1,11 @@
 import { useState } from "react";
 import Sheet from "./Sheet";
 import Icon from "./Icon";
-import StopTreatmentSheet from "./StopTreatmentSheet";
+import { update } from "../lib/store";
 import { isTreatmentActive } from "../lib/selectors";
 import type { Treatment } from "../lib/types";
-import { formatDate } from "../lib/dates";
+import { STOP_REASONS } from "../lib/types";
+import { formatDate, todayISO } from "../lib/dates";
 
 function Row({ label, value }: { label: string; value: string }) {
   return (
@@ -25,9 +26,68 @@ export default function TreatmentDetailSheet({
   onEdit: () => void;
 }) {
   const t = treatment;
-  const [stopping, setStopping] = useState(false);
+  const [mode, setMode] = useState<"view" | "stop" | "delete">("view");
   const active = isTreatmentActive(t);
 
+  function stop(reason: string) {
+    update((d) => {
+      const x = d.treatments.find((y) => y.id === t.id);
+      if (x) {
+        if (!x.endDate || x.endDate > todayISO()) x.endDate = todayISO();
+        x.stopReason = reason;
+        x.followUpDone = true;
+        x.resolved = reason === "Problème résolu";
+      }
+    });
+    onClose();
+  }
+
+  function remove() {
+    update((d) => {
+      d.treatments = d.treatments.filter((y) => y.id !== t.id);
+    });
+    onClose();
+  }
+
+  // Stop-reason step
+  if (mode === "stop") {
+    return (
+      <Sheet title="Arrêter le traitement" onClose={onClose}>
+        <p style={{ fontSize: 14, color: "var(--muted)", margin: "4px 0 16px", lineHeight: 1.5 }}>
+          Pourquoi arrêter « <b>{t.medication}</b> » ? Il sera archivé dans les traitements terminés.
+        </p>
+        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+          {STOP_REASONS.map((r) => (
+            <button key={r} className="btn block" style={{ justifyContent: "flex-start" }} onClick={() => stop(r)}>
+              {r}
+            </button>
+          ))}
+        </div>
+        <button className="btn ghost block" style={{ marginTop: 10, color: "var(--muted)" }} onClick={() => setMode("view")}>
+          Retour
+        </button>
+      </Sheet>
+    );
+  }
+
+  // Delete confirmation step
+  if (mode === "delete") {
+    return (
+      <Sheet title="Supprimer le traitement" onClose={onClose}>
+        <p style={{ fontSize: 14, color: "var(--muted)", margin: "4px 0 20px", lineHeight: 1.5 }}>
+          Supprimer définitivement « <b>{t.medication}</b> » ? Cette action est irréversible (contrairement à « Arrêter », qui le garde dans l'historique).
+        </p>
+        <button className="btn primary block" style={{ background: "var(--danger)", borderColor: "var(--danger)" }} onClick={remove}>
+          <Icon name="trash" size={17} /> Supprimer définitivement
+        </button>
+        <button className="btn ghost block" style={{ marginTop: 8, color: "var(--muted)" }} onClick={() => setMode("view")}>
+          Annuler
+        </button>
+      </Sheet>
+    );
+  }
+
+  // Detail view
   return (
     <Sheet title={t.medication} onClose={onClose}>
       <div style={{ marginTop: 6 }}>
@@ -44,6 +104,7 @@ export default function TreatmentDetailSheet({
           </div>
         )}
       </div>
+
       <button className="btn primary block" style={{ marginTop: 20 }} onClick={onEdit}>
         <Icon name="edit" size={17} /> Modifier
       </button>
@@ -51,21 +112,14 @@ export default function TreatmentDetailSheet({
         <button
           className="btn block"
           style={{ marginTop: 6, color: "var(--danger)", borderColor: "var(--danger)" }}
-          onClick={() => setStopping(true)}
+          onClick={() => setMode("stop")}
         >
           Arrêter le traitement
         </button>
       )}
-
-      {stopping && (
-        <StopTreatmentSheet
-          treatment={t}
-          onClose={() => {
-            setStopping(false);
-            onClose();
-          }}
-        />
-      )}
+      <button className="btn danger-text block" style={{ marginTop: 6 }} onClick={() => setMode("delete")}>
+        <Icon name="trash" size={16} /> Supprimer
+      </button>
     </Sheet>
   );
 }
