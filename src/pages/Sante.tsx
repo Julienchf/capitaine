@@ -2,14 +2,14 @@ import { useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import Icon from "../components/Icon";
 import Sheet from "../components/Sheet";
-import TreatmentSheet, { type TreatmentDraft } from "../components/TreatmentSheet";
+import TreatmentSheet from "../components/TreatmentSheet";
 import TraitementsTab from "../components/TraitementsTab";
 import RdvTab from "../components/RdvTab";
 import EventCard from "../components/EventCard";
 import { useData, update, uid } from "../lib/store";
 import { allCareStatuses, careInterval } from "../lib/selectors";
 import { CARE_META, ANTIPARASITE_FORMS } from "../lib/types";
-import type { CareKind, HealthEntry, Attachment, CareEvent, AntiparasiteForm } from "../lib/types";
+import type { CareKind, HealthEntry, Attachment, CareEvent, AntiparasiteForm, Treatment } from "../lib/types";
 import { formatDate, formatShort, relativeToToday, todayISO } from "../lib/dates";
 import { euro, fileToDataUrl } from "../lib/format";
 
@@ -51,7 +51,6 @@ export default function Sante() {
   const [configKind, setConfigKind] = useState<CareKind | null>(null);
   const [editEntry, setEditEntry] = useState<HealthEntry | "new" | null>(null);
   const [detailEntry, setDetailEntry] = useState<HealthEntry | null>(null);
-  const [treatmentDraft, setTreatmentDraft] = useState<TreatmentDraft | null>(null);
   const [search, setSearch] = useState("");
 
   const statuses = allCareStatuses(data);
@@ -245,22 +244,7 @@ export default function Sante() {
         />
       )}
       {editEntry && (
-        <HealthSheet
-          entry={editEntry === "new" ? null : editEntry}
-          onClose={() => setEditEntry(null)}
-          onCreated={(e) => {
-            if (e.medications) {
-              setTreatmentDraft({
-                medication: e.medications,
-                startDate: e.date,
-                healthEntryId: e.id,
-              });
-            }
-          }}
-        />
-      )}
-      {treatmentDraft && (
-        <TreatmentSheet draft={treatmentDraft} onClose={() => setTreatmentDraft(null)} />
+        <HealthSheet entry={editEntry === "new" ? null : editEntry} onClose={() => setEditEntry(null)} />
       )}
     </div>
   );
@@ -427,21 +411,17 @@ function CareEventSheet({
   );
 }
 
-function HealthSheet({
-  entry,
-  onClose,
-  onCreated,
-}: {
-  entry: HealthEntry | null;
-  onClose: () => void;
-  onCreated?: (entry: HealthEntry) => void;
-}) {
+function HealthSheet({ entry, onClose }: { entry: HealthEntry | null; onClose: () => void }) {
+  const data = useData();
   const [title, setTitle] = useState(entry?.title ?? "");
   const [date, setDate] = useState(entry?.date ?? todayISO());
   const [description, setDescription] = useState(entry?.description ?? "");
-  const [medications, setMedications] = useState(entry?.medications ?? "");
   const [cost, setCost] = useState(entry?.cost != null ? String(entry.cost) : "");
   const [attachments, setAttachments] = useState<Attachment[]>(entry?.attachments ?? []);
+  const [rx, setRx] = useState<Treatment[]>(
+    entry ? data.treatments.filter((t) => t.healthEntryId === entry.id) : [],
+  );
+  const [rxEdit, setRxEdit] = useState<Treatment | "new" | null>(null);
 
   async function onFiles(files: FileList | null) {
     if (!files) return;
@@ -455,7 +435,7 @@ function HealthSheet({
 
   function save() {
     if (!title.trim()) return;
-    let created: HealthEntry | undefined;
+    const entryId = entry ? entry.id : uid();
     update((d) => {
       if (entry) {
         const t = d.health.find((h) => h.id === entry.id);
@@ -463,24 +443,29 @@ function HealthSheet({
           t.title = title;
           t.date = date;
           t.description = description || undefined;
-          t.medications = medications || undefined;
           t.cost = cost ? parseFloat(cost) : undefined;
           t.attachments = attachments;
         }
       } else {
-        created = {
-          id: uid(),
+        d.health.push({
+          id: entryId,
           title,
           date,
           description: description || undefined,
-          medications: medications || undefined,
           cost: cost ? parseFloat(cost) : undefined,
           attachments,
-        };
-        d.health.push(created);
+        });
+      }
+      // Reconcile the treatments linked to this entry.
+      const rxIds = new Set(rx.map((t) => t.id));
+      d.treatments = d.treatments.filter((t) => t.healthEntryId !== entryId || rxIds.has(t.id));
+      for (const t of rx) {
+        const rec: Treatment = { ...t, healthEntryId: entryId, startDate: t.startDate || date };
+        const ex = d.treatments.find((x) => x.id === t.id);
+        if (ex) Object.assign(ex, rec);
+        else d.treatments.push(rec);
       }
     });
-    if (created) onCreated?.(created);
     onClose();
   }
 
@@ -493,58 +478,96 @@ function HealthSheet({
   }
 
   return (
-    <Sheet title={entry ? "Modifier" : "Nouveau pépin de santé"} onClose={onClose}>
-      <div className="field">
-        <label>Intitulé</label>
-        <input placeholder="ex. Boiterie patte avant" value={title} onChange={(e) => setTitle(e.target.value)} />
-      </div>
-      <div className="field">
-        <label>Date</label>
-        <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
-      </div>
-      <div className="field">
-        <label>Description (optionnel)</label>
-        <textarea placeholder="Symptômes, diagnostic du véto…" value={description} onChange={(e) => setDescription(e.target.value)} />
-      </div>
-      <div className="field">
-        <label>Médicaments prescrits (optionnel)</label>
-        <textarea placeholder="ex. Metacam 1,5 ml / jour, 5 jours" value={medications} onChange={(e) => setMedications(e.target.value)} />
-      </div>
-      <div className="field">
-        <label>Coût (optionnel)</label>
-        <input type="number" inputMode="decimal" placeholder="ex. 48" value={cost} onChange={(e) => setCost(e.target.value)} />
-      </div>
-
-      <div className="field">
-        <label>Ordonnances / factures</label>
-        <div className="chips" style={{ marginBottom: attachments.length ? 10 : 0 }}>
-          {attachments.map((a) => (
-            <span key={a.id} className="chip on" onClick={() => setAttachments((x) => x.filter((y) => y.id !== a.id))}>
-              <Icon name="file" size={15} /> {a.name.length > 16 ? a.name.slice(0, 14) + "…" : a.name} ✕
-            </span>
-          ))}
+    <>
+      <Sheet title={entry ? "Modifier" : "Nouveau pépin de santé"} onClose={onClose}>
+        <div className="field">
+          <label>Intitulé</label>
+          <input placeholder="ex. Boiterie patte avant" value={title} onChange={(e) => setTitle(e.target.value)} />
         </div>
-        <label className="btn block" style={{ cursor: "pointer" }}>
-          <Icon name="camera" size={18} /> Photo ou fichier
-          <input
-            type="file"
-            accept="image/*,application/pdf"
-            multiple
-            hidden
-            onChange={(e) => onFiles(e.target.files)}
-          />
-        </label>
-      </div>
+        <div className="field">
+          <label>Date</label>
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
+        </div>
+        <div className="field">
+          <label>Description (optionnel)</label>
+          <textarea placeholder="Symptômes, diagnostic du véto…" value={description} onChange={(e) => setDescription(e.target.value)} />
+        </div>
 
-      <button className="btn primary block" style={{ marginTop: 20 }} onClick={save}>
-        Enregistrer
-      </button>
-      {entry && (
-        <button className="btn danger-text block" style={{ marginTop: 6 }} onClick={remove}>
-          Supprimer cette entrée
+        <div className="field">
+          <label>Traitements prescrits (optionnel)</label>
+          {rx.length > 0 && (
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, marginBottom: 8 }}>
+              {rx.map((t) => (
+                <div className="row" key={t.id} style={{ padding: "10px 12px" }}>
+                  <div className="ic-badge ic-danger"><Icon name="pill" size={18} /></div>
+                  <div className="grow" style={{ cursor: "pointer" }} onClick={() => setRxEdit(t)}>
+                    <div className="title">{t.medication}</div>
+                    <div className="meta">
+                      {[t.dose, t.frequency, t.timing].filter(Boolean).join(" · ") || "toucher pour préciser"}
+                    </div>
+                  </div>
+                  <button
+                    className="btn danger-text"
+                    style={{ padding: 4 }}
+                    aria-label="Retirer"
+                    onClick={() => setRx((r) => r.filter((x) => x.id !== t.id))}
+                  >
+                    <Icon name="trash" size={17} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+          <button className="btn block" onClick={() => setRxEdit("new")}>
+            <Icon name="plus" size={17} /> Ajouter un traitement
+          </button>
+        </div>
+
+        <div className="field">
+          <label>Coût (optionnel)</label>
+          <input type="number" inputMode="decimal" placeholder="ex. 48" value={cost} onChange={(e) => setCost(e.target.value)} />
+        </div>
+
+        <div className="field">
+          <label>Ordonnances / factures</label>
+          <div className="chips" style={{ marginBottom: attachments.length ? 10 : 0 }}>
+            {attachments.map((a) => (
+              <span key={a.id} className="chip on" onClick={() => setAttachments((x) => x.filter((y) => y.id !== a.id))}>
+                <Icon name="file" size={15} /> {a.name.length > 16 ? a.name.slice(0, 14) + "…" : a.name} ✕
+              </span>
+            ))}
+          </div>
+          <label className="btn block" style={{ cursor: "pointer" }}>
+            <Icon name="camera" size={18} /> Photo ou fichier
+            <input type="file" accept="image/*,application/pdf" multiple hidden onChange={(e) => onFiles(e.target.files)} />
+          </label>
+        </div>
+
+        <button className="btn primary block" style={{ marginTop: 20 }} onClick={save}>
+          Enregistrer
         </button>
+        {entry && (
+          <button className="btn danger-text block" style={{ marginTop: 6 }} onClick={remove}>
+            Supprimer cette entrée
+          </button>
+        )}
+      </Sheet>
+
+      {rxEdit && (
+        <TreatmentSheet
+          treatment={rxEdit === "new" ? undefined : rxEdit}
+          draft={rxEdit === "new" ? { startDate: date } : undefined}
+          onClose={() => setRxEdit(null)}
+          onSubmit={(t) =>
+            setRx((r) =>
+              rxEdit === "new"
+                ? [...r, { ...t, id: uid() }]
+                : r.map((x) => (x.id === rxEdit.id ? { ...t, id: rxEdit.id } : x)),
+            )
+          }
+        />
       )}
-    </Sheet>
+    </>
   );
 }
 
@@ -610,6 +633,8 @@ function HealthDetailSheet({
   onClose: () => void;
   onEdit: () => void;
 }) {
+  const data = useData();
+  const rx = data.treatments.filter((t) => t.healthEntryId === entry.id);
   return (
     <Sheet title={entry.title} onClose={onClose}>
       <div style={{ marginTop: 6 }}>
@@ -618,6 +643,27 @@ function HealthDetailSheet({
         {entry.description && <DetailBlock label="Description" value={entry.description} />}
         {entry.medications && <DetailBlock label="Médicaments prescrits" value={entry.medications} />}
       </div>
+
+      {rx.length > 0 && (
+        <div className="field">
+          <label>Traitements prescrits</label>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {rx.map((t) => (
+              <div className="row" key={t.id} style={{ padding: "10px 12px" }}>
+                <div className="ic-badge ic-danger"><Icon name="pill" size={18} /></div>
+                <div className="grow">
+                  <div className="title">{t.medication}</div>
+                  <div className="meta">
+                    {[t.dose, t.frequency, t.timing].filter(Boolean).join(" · ")}
+                    {t.endDate ? ` · jusqu'au ${formatShort(t.endDate)}` : " · en continu"}
+                    {t.stopReason ? ` · arrêté (${t.stopReason})` : ""}
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {entry.attachments.length > 0 && (
         <div className="field">

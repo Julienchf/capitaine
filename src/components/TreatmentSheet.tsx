@@ -15,10 +15,13 @@ export default function TreatmentSheet({
   treatment,
   draft,
   onClose,
+  onSubmit,
 }: {
   treatment?: Treatment;
   draft?: TreatmentDraft;
   onClose: () => void;
+  /** When provided, return the treatment data instead of writing to the store. */
+  onSubmit?: (t: Omit<Treatment, "id">) => void;
 }) {
   const [medication, setMedication] = useState(treatment?.medication ?? draft?.medication ?? "");
   const [dose, setDose] = useState(treatment?.dose ?? "");
@@ -31,6 +34,20 @@ export default function TreatmentSheet({
 
   function save() {
     if (!medication.trim()) return;
+    if (onSubmit) {
+      onSubmit({
+        healthEntryId: draft?.healthEntryId,
+        medication,
+        dose: dose || undefined,
+        frequency: frequency || undefined,
+        timing: timing || undefined,
+        startDate,
+        endDate: lifelong ? undefined : endDate || undefined,
+        notes: notes || undefined,
+      });
+      onClose();
+      return;
+    }
     update((d) => {
       if (treatment) {
         const t = d.treatments.find((x) => x.id === treatment.id);
