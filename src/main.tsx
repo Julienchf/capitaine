@@ -39,3 +39,17 @@ createRoot(document.getElementById("root")!).render(
     <RouterProvider router={router} />
   </StrictMode>,
 );
+
+// Keep the installed PWA fresh: check for a new service worker regularly and
+// reload once it takes control, so deploys apply without a manual reinstall.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.ready.then((reg) => {
+    setInterval(() => reg.update().catch(() => {}), 60 * 1000);
+  });
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
+}
