@@ -8,9 +8,10 @@ export const supabase: SupabaseClient | null =
   url && anonKey
     ? createClient(url, anonKey, {
         auth: {
-          // PKCE returns the token as ?code=… (query), not in the URL #fragment,
-          // so it doesn't collide with the app's hash-based router.
-          flowType: "pkce",
+          // Implicit flow: the magic-link token works whatever browser opens it
+          // (no code-verifier tied to the originating browser). With a path-based
+          // router (createBrowserRouter) it doesn't collide with the URL.
+          flowType: "implicit",
           detectSessionInUrl: true,
           persistSession: true,
           autoRefreshToken: true,
