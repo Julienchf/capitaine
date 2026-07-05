@@ -1,15 +1,16 @@
+import { useState } from "react";
 import Icon from "./Icon";
 import { activeTreatments, allCareStatuses } from "../lib/selectors";
 import { CARE_META } from "../lib/types";
 import type { AppData, HealthEntry, Treatment } from "../lib/types";
-import { ageText, formatDate } from "../lib/dates";
-import { euro } from "../lib/format";
+import { ageText, formatDate, relativeToToday } from "../lib/dates";
 
 export default function SharedCard({ data }: { data: AppData }) {
   const { profile } = data;
   const health = [...data.health].sort((a, b) => b.date.localeCompare(a.date));
   const treatments = activeTreatments(data);
   const care = allCareStatuses(data);
+  const [showAllHealth, setShowAllHealth] = useState(false);
   const hasVet =
     profile.vetName || profile.vetPhone || profile.vetEmail || profile.vetAddress || profile.vetMapsUrl;
   const guideSections = [
@@ -18,6 +19,8 @@ export default function SharedCard({ data }: { data: AppData }) {
     { title: "Ce que Capitaine sait", content: profile.commands },
     { title: "Règles à la maison", content: profile.rules },
   ].filter((s) => s.content);
+
+  const shownHealth = showAllHealth ? health : health.slice(0, 5);
 
   return (
     <>
@@ -108,7 +111,9 @@ export default function SharedCard({ data }: { data: AppData }) {
                   <span style={{ fontWeight: 500 }}>{s.title}</span>
                   <span className="chev"><Icon name="chevron" size={16} /></span>
                 </summary>
-                <div className="acc-body" style={{ whiteSpace: "pre-wrap", color: "var(--text)" }}>{s.content}</div>
+                <div className="acc-body" style={{ color: "var(--text)" }}>
+                  <GuideText text={s.content!} />
+                </div>
               </details>
             ))}
           </div>
@@ -122,22 +127,42 @@ export default function SharedCard({ data }: { data: AppData }) {
         </>
       )}
 
+      {/* Recurring care — last / next / overdue */}
       <div className="section-title"><Icon name="scissors" size={15} /> Soins récurrents</div>
       <div className="card card-pad">
-        {care.map((c, i) => (
-          <div key={c.kind} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "9px 0", borderTop: i ? "0.5px solid var(--line)" : "none" }}>
-            <span style={{ fontSize: 14 }}>{CARE_META[c.kind].label}</span>
-            <span style={{ fontSize: 13.5, color: "var(--muted)" }}>{c.nextDue ? formatDate(c.nextDue) : "à planifier"}</span>
-          </div>
-        ))}
+        {care.map((c, i) => {
+          const pillCls = !c.nextDue ? "muted" : c.overdue ? "danger" : c.daysUntil! <= 10 ? "warning" : "ok";
+          const pillTxt = !c.nextDue ? "à planifier" : c.overdue ? "en retard" : relativeToToday(c.nextDue).text;
+          return (
+            <div key={c.kind} style={{ padding: "10px 0", borderTop: i ? "0.5px solid var(--line)" : "none" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <span style={{ fontSize: 14, fontWeight: 500 }}>{CARE_META[c.kind].label}</span>
+                <span className={`pill ${pillCls}`}>{pillTxt}</span>
+              </div>
+              <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 3 }}>
+                {c.lastDone ? `Dernier : ${formatDate(c.lastDone)}` : "Jamais fait"}
+                {c.nextDue ? ` · Prochain : ${formatDate(c.nextDue)}` : ""}
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {health.length > 0 && (
         <>
           <div className="section-title"><Icon name="health" size={15} /> Antécédents ({health.length})</div>
           <div className="card" style={{ padding: "0 15px" }}>
-            {health.map((h) => <HealthAccordion key={h.id} h={h} />)}
+            {shownHealth.map((h) => <HealthAccordion key={h.id} h={h} />)}
           </div>
+          {health.length > 5 && (
+            <button
+              className="btn ghost block"
+              style={{ marginTop: 8, color: "var(--accent-ink)" }}
+              onClick={() => setShowAllHealth((v) => !v)}
+            >
+              {showAllHealth ? "Réduire" : `Voir les ${health.length - 5} autres`}
+            </button>
+          )}
         </>
       )}
     </>
@@ -149,6 +174,47 @@ function InfoLine({ icon, children }: { icon: Parameters<typeof Icon>[0]["name"]
     <div style={{ display: "flex", alignItems: "flex-start", gap: 10, fontSize: 14, lineHeight: 1.5 }}>
       <span style={{ color: "var(--faint)", marginTop: 1, flexShrink: 0 }}><Icon name={icon} size={16} /></span>
       <div>{children}</div>
+    </div>
+  );
+}
+
+/** Renders a guide section's plain text as a clean list (bullets, numbers, paragraphs). */
+function GuideText({ text }: { text: string }) {
+  const lines = text.split("\n");
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+      {lines.map((raw, i) => {
+        const t = raw.trim();
+        if (!t) return null;
+        const num = t.match(/^(\d+)[.)]\s*(.*)$/);
+        if (num) {
+          return (
+            <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <span
+                style={{
+                  flexShrink: 0, width: 20, height: 20, borderRadius: "50%",
+                  background: "var(--accent-soft)", color: "var(--accent-ink)",
+                  fontSize: 11.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center",
+                }}
+              >
+                {num[1]}
+              </span>
+              <span style={{ fontSize: 14, lineHeight: 1.45, color: "var(--text)" }}>{num[2]}</span>
+            </div>
+          );
+        }
+        if (t.startsWith("•") || t.startsWith("-")) {
+          return (
+            <div key={i} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
+              <span style={{ color: "var(--accent)", fontSize: 15, lineHeight: 1.35, flexShrink: 0 }}>•</span>
+              <span style={{ fontSize: 14, lineHeight: 1.45, color: "var(--text)" }}>{t.replace(/^[•-]\s*/, "")}</span>
+            </div>
+          );
+        }
+        return (
+          <div key={i} style={{ fontSize: 14, lineHeight: 1.5, color: "var(--text)" }}>{t}</div>
+        );
+      })}
     </div>
   );
 }
@@ -188,9 +254,8 @@ function HealthAccordion({ h }: { h: HealthEntry }) {
       <div className="acc-body">
         {h.description && <div>{h.description}</div>}
         {h.medications && <div>Médicaments : {h.medications}</div>}
-        {h.cost != null && <div>Coût : {euro(h.cost)}</div>}
         {h.attachments.length > 0 && <div>{h.attachments.length} pièce(s) jointe(s)</div>}
-        {!h.description && !h.medications && h.cost == null && !h.attachments.length && (
+        {!h.description && !h.medications && !h.attachments.length && (
           <div style={{ color: "var(--faint)" }}>Aucun détail supplémentaire.</div>
         )}
       </div>

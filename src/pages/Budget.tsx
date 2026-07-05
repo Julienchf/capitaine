@@ -32,6 +32,7 @@ export default function Budget() {
   const [from, setFrom] = useState(startOfYearISO());
   const [to, setTo] = useState(todayISO());
   const [sheet, setSheet] = useState<Expense | "new" | null>(null);
+  const [expanded, setExpanded] = useState(false);
 
   const range = useMemo(() => {
     if (period === "month") {
@@ -183,7 +184,7 @@ export default function Budget() {
           Aucune dépense sur cette période.
         </div>
       ) : (
-        items.map((it) => {
+        (expanded ? items : items.slice(0, 5)).map((it) => {
           const meta = EXPENSE_META[it.category];
           const sub =
             `${formatShort(it.date)} · ${meta.label}` +
@@ -215,6 +216,16 @@ export default function Budget() {
             <div className="row" key={it.id} style={{ marginBottom: 8 }}>{inner}</div>
           );
         })
+      )}
+
+      {items.length > 5 && (
+        <button
+          className="btn ghost block"
+          style={{ marginTop: 4, color: "var(--accent-ink)" }}
+          onClick={() => setExpanded((v) => !v)}
+        >
+          {expanded ? "Réduire la liste" : `Voir les ${items.length - 5} autres dépenses`}
+        </button>
       )}
 
       <button className="fab" aria-label="Ajouter une dépense" onClick={() => setSheet("new")}>

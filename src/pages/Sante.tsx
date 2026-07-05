@@ -192,18 +192,21 @@ export default function Sante() {
                 <EventCard
                   key={h.id}
                   title={h.title}
-                  dateLabel={formatShort(h.date)}
+                  dateLabel={formatDate(h.date)}
                   extra={
-                    h.attachments.length > 0 ? (
-                      <span
-                        style={{
-                          fontSize: 11, color: "var(--accent-ink)", background: "var(--accent-soft)",
-                          padding: "2px 7px", borderRadius: 999, display: "flex", alignItems: "center", gap: 3,
-                        }}
-                      >
-                        <Icon name="file" size={12} /> {h.attachments.length}
-                      </span>
-                    ) : undefined
+                    <>
+                      {h.cost != null && <CostChip value={h.cost} />}
+                      {h.attachments.length > 0 && (
+                        <span
+                          style={{
+                            fontSize: 11, color: "var(--accent-ink)", background: "var(--accent-soft)",
+                            padding: "2px 7px", borderRadius: 999, display: "flex", alignItems: "center", gap: 3,
+                          }}
+                        >
+                          <Icon name="file" size={12} /> {h.attachments.length}
+                        </span>
+                      )}
+                    </>
                   }
                   onClick={() => setDetailEntry(h)}
                 />
