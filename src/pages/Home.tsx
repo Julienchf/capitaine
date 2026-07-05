@@ -5,7 +5,7 @@ import TreatmentSheet from "../components/TreatmentSheet";
 import TreatmentDetailSheet from "../components/TreatmentDetailSheet";
 import { useData } from "../lib/store";
 import type { Treatment } from "../lib/types";
-import { activeTreatments, allCareStatuses, expensesBetween, nextAppointment, stockStatus, sum } from "../lib/selectors";
+import { activeTreatments, allCareStatuses, budgetItems, budgetTotal, nextAppointment, stockStatus } from "../lib/selectors";
 import { CARE_META } from "../lib/types";
 import type { CareKind } from "../lib/types";
 import {
@@ -36,7 +36,7 @@ export default function Home() {
   const [y, m] = mk.split("-").map(Number);
   const first = `${mk}-01`;
   const last = new Date(y, m, 0).toISOString().slice(0, 10);
-  const spent = sum(expensesBetween(data.expenses, first, last));
+  const spent = budgetTotal(budgetItems(data, first, last));
   const budget = data.monthlyBudget;
   const pct = Math.min(100, Math.round((spent / budget) * 100));
   const over = spent > budget;

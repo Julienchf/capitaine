@@ -53,11 +53,16 @@ export default function Rappels() {
                   onClick={() =>
                     update((d) => {
                       const t = d.stock.find((x) => x.id === item.id);
-                      if (t) t.lastRestock = todayISO();
+                      if (!t) return;
+                      t.lastRestock = todayISO();
+                      // Log the purchase so it counts in the budget.
+                      if (t.cost) {
+                        t.purchases = [...(t.purchases ?? []), { id: uid(), date: todayISO(), amount: t.cost }];
+                      }
                     })
                   }
                 >
-                  Recommandé ✓
+                  {item.cost ? "Racheté ✓" : "Recommandé ✓"}
                 </button>
               </div>
             </div>
@@ -81,9 +86,11 @@ function StockSheet({ item, onClose }: { item: StockItem | null; onClose: () => 
   const [kind, setKind] = useState<StockKind>(item?.kind ?? "croquettes");
   const [durationDays, setDurationDays] = useState(String(item?.durationDays ?? 30));
   const [lastRestock, setLastRestock] = useState(item?.lastRestock ?? todayISO());
+  const [cost, setCost] = useState(item?.cost != null ? String(item.cost) : "");
 
   function save() {
     if (!name.trim()) return;
+    const costN = cost ? parseFloat(cost) : undefined;
     update((d) => {
       if (item) {
         const t = d.stock.find((x) => x.id === item.id);
@@ -92,6 +99,7 @@ function StockSheet({ item, onClose }: { item: StockItem | null; onClose: () => 
           t.kind = kind;
           t.durationDays = parseInt(durationDays) || 30;
           t.lastRestock = lastRestock;
+          t.cost = costN;
         }
       } else {
         d.stock.push({
@@ -100,6 +108,9 @@ function StockSheet({ item, onClose }: { item: StockItem | null; onClose: () => 
           kind,
           durationDays: parseInt(durationDays) || 30,
           lastRestock,
+          cost: costN,
+          // Log the first purchase (at the last-restock date) so it counts in the budget.
+          purchases: costN ? [{ id: uid(), date: lastRestock, amount: costN }] : [],
         });
       }
     });
@@ -129,6 +140,13 @@ function StockSheet({ item, onClose }: { item: StockItem | null; onClose: () => 
       <div className="field">
         <label>Dernier réassort</label>
         <input type="date" value={lastRestock} onChange={(e) => setLastRestock(e.target.value)} />
+      </div>
+      <div className="field">
+        <label>Coût par réassort (€, optionnel)</label>
+        <input type="number" inputMode="decimal" placeholder="ex. 45" value={cost} onChange={(e) => setCost(e.target.value)} />
+        <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 6 }}>
+          Compté dans le budget à chaque « Racheté ✓ ».
+        </div>
       </div>
       <button className="btn primary block" style={{ marginTop: 20 }} onClick={save}>
         Enregistrer

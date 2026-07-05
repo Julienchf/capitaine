@@ -1,4 +1,4 @@
-import type { AppData, Appointment, CareKind, Expense, StockItem, Treatment } from "./types";
+import type { AppData, Appointment, CareKind, Expense, ExpenseCategory, StockItem, StockKind, Treatment } from "./types";
 import { CARE_META, REMINDER_OFFSETS } from "./types";
 import { addDays, daysBetween, todayISO } from "./dates";
 
@@ -82,6 +82,54 @@ export function expensesBetween(
 
 export function sum(expenses: Expense[]): number {
   return expenses.reduce((t, e) => t + e.amount, 0);
+}
+
+/** A line in the budget — from a manual expense, a care event, a health entry or a stock purchase. */
+export interface BudgetItem {
+  id: string;
+  date: string;
+  amount: number;
+  category: ExpenseCategory;
+  label: string;
+  source: "expense" | "soin" | "sante" | "stock";
+  expenseId?: string; // set when the item is an editable manual expense
+}
+
+function stockCategory(kind: StockKind): ExpenseCategory {
+  if (kind === "croquettes") return "nourriture";
+  if (kind === "friandises") return "friandises";
+  if (kind === "sacs") return "hygiene";
+  return "autre";
+}
+
+/** All money spent in a date range, aggregated across every source. */
+export function budgetItems(data: AppData, fromISO: string, toISO: string): BudgetItem[] {
+  const inRange = (d: string) => d >= fromISO && d <= toISO;
+  const items: BudgetItem[] = [];
+
+  for (const e of data.expenses) {
+    if (inRange(e.date))
+      items.push({ id: e.id, date: e.date, amount: e.amount, category: e.category, label: e.label || "", source: "expense", expenseId: e.id });
+  }
+  for (const c of data.careEvents) {
+    if (c.cost && inRange(c.date))
+      items.push({ id: `care-${c.id}`, date: c.date, amount: c.cost, category: c.kind === "epilation" ? "toilettage" : "veto", label: CARE_META[c.kind].label, source: "soin" });
+  }
+  for (const h of data.health) {
+    if (h.cost && inRange(h.date))
+      items.push({ id: `health-${h.id}`, date: h.date, amount: h.cost, category: "veto", label: h.title, source: "sante" });
+  }
+  for (const s of data.stock) {
+    for (const p of s.purchases ?? []) {
+      if (inRange(p.date))
+        items.push({ id: `stock-${p.id}`, date: p.date, amount: p.amount, category: stockCategory(s.kind), label: s.name, source: "stock" });
+    }
+  }
+  return items.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export function budgetTotal(items: BudgetItem[]): number {
+  return items.reduce((t, i) => t + i.amount, 0);
 }
 
 /** A treatment is active if today is within its window AND it wasn't stopped. */

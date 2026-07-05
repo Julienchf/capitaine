@@ -2,9 +2,11 @@ import { useMemo, useState } from "react";
 import Icon from "../components/Icon";
 import Sheet from "../components/Sheet";
 import { useData, update, uid } from "../lib/store";
-import { expensesBetween, periodBudget, sum } from "../lib/selectors";
+import { budgetItems, budgetTotal, periodBudget } from "../lib/selectors";
 import { EXPENSE_META } from "../lib/types";
 import type { ExpenseCategory } from "../lib/types";
+
+const SOURCE_LABEL: Record<string, string> = { soin: "Soin", sante: "Santé", stock: "Stock" };
 import {
   currentMonthKey,
   formatShort,
@@ -45,14 +47,14 @@ export default function Budget() {
     return { from, to, label: "Période choisie" };
   }, [period, monthK, from, to]);
 
-  const list = expensesBetween(data.expenses, range.from, range.to);
-  const total = sum(list);
+  const items = useMemo(() => budgetItems(data, range.from, range.to), [data, range.from, range.to]);
+  const total = budgetTotal(items);
 
   const byCat = useMemo(() => {
     const m = new Map<ExpenseCategory, number>();
-    for (const e of list) m.set(e.category, (m.get(e.category) ?? 0) + e.amount);
+    for (const it of items) m.set(it.category, (m.get(it.category) ?? 0) + it.amount);
     return [...m.entries()].sort((a, b) => b[1] - a[1]);
-  }, [list]);
+  }, [items]);
 
   const budget = useMemo(() => {
     if (period === "month") return data.monthlyBudget;
@@ -146,7 +148,7 @@ export default function Budget() {
         {period !== "month" && (
           <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 8 }}>
             Budget prévu {period === "year" ? "sur l'année" : "sur la période"} : {euro(budget)}
-            {list.length > 0 ? ` · ${list.length} dépense${list.length > 1 ? "s" : ""}` : ""}
+            {items.length > 0 ? ` · ${items.length} dépense${items.length > 1 ? "s" : ""}` : ""}
           </div>
         )}
       </div>
@@ -175,32 +177,44 @@ export default function Budget() {
       )}
 
       <div className="section-title">Dépenses</div>
-      {list.length === 0 ? (
+      {items.length === 0 ? (
         <div className="empty">
           <Icon name="wallet" size={34} className="ic" />
           Aucune dépense sur cette période.
         </div>
       ) : (
-        list.map((e) => (
-          <button
-            className="row"
-            key={e.id}
-            style={{ marginBottom: 8, width: "100%", textAlign: "left" }}
-            onClick={() => setSheet(e)}
-          >
-            <div className="ic-badge ic-muted" style={{ fontSize: 18 }}>
-              {EXPENSE_META[e.category].icon}
-            </div>
-            <div className="grow">
-              <div className="title">{e.label || EXPENSE_META[e.category].label}</div>
-              <div className="meta">
-                {formatShort(e.date)} · {EXPENSE_META[e.category].label}
+        items.map((it) => {
+          const meta = EXPENSE_META[it.category];
+          const sub =
+            `${formatShort(it.date)} · ${meta.label}` +
+            (it.source !== "expense" ? ` · ${SOURCE_LABEL[it.source]}` : "");
+          const inner = (
+            <>
+              <div className="ic-badge ic-muted" style={{ fontSize: 18 }}>{meta.icon}</div>
+              <div className="grow">
+                <div className="title">{it.label || meta.label}</div>
+                <div className="meta">{sub}</div>
               </div>
-            </div>
-            <span style={{ fontSize: 15, fontWeight: 500 }}>{euro(e.amount)}</span>
-            <Icon name="chevron" size={18} className="ic-badge" />
-          </button>
-        ))
+              <span style={{ fontSize: 15, fontWeight: 500 }}>{euro(it.amount)}</span>
+              {it.source === "expense" && <Icon name="chevron" size={18} className="ic-badge" />}
+            </>
+          );
+          return it.source === "expense" ? (
+            <button
+              className="row"
+              key={it.id}
+              style={{ marginBottom: 8, width: "100%", textAlign: "left" }}
+              onClick={() => {
+                const e = data.expenses.find((x) => x.id === it.expenseId);
+                if (e) setSheet(e);
+              }}
+            >
+              {inner}
+            </button>
+          ) : (
+            <div className="row" key={it.id} style={{ marginBottom: 8 }}>{inner}</div>
+          );
+        })
       )}
 
       <button className="fab" aria-label="Ajouter une dépense" onClick={() => setSheet("new")}>

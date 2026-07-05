@@ -45,12 +45,20 @@ export interface Expense {
 
 export type StockKind = "croquettes" | "friandises" | "sacs" | "autre";
 
+export interface StockPurchase {
+  id: string;
+  date: string; // ISO date
+  amount: number;
+}
+
 export interface StockItem {
   id: string;
   name: string;
   kind: StockKind;
   lastRestock: string; // ISO date
   durationDays: number; // how long one restock is expected to last
+  cost?: number; // cost of one restock (€)
+  purchases?: StockPurchase[]; // logged restock purchases, for the budget
 }
 
 export const STOCK_META: Record<StockKind, { label: string; emoji: string; icon: string; iconClass: string }> = {
