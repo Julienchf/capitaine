@@ -211,6 +211,35 @@ function GuideText({ text }: { text: string }) {
             </div>
           );
         }
+        // "Label : item · item · item" → label + chips (e.g. "ce que Capitaine sait")
+        if (t.includes(" · ")) {
+          const colon = t.indexOf(":");
+          let label = "";
+          let listPart = t;
+          if (colon !== -1 && t.slice(colon + 1).includes("·")) {
+            label = t.slice(0, colon).trim();
+            listPart = t.slice(colon + 1).trim();
+          }
+          const chips = listPart.split("·").map((s) => s.trim()).filter(Boolean);
+          return (
+            <div key={i}>
+              {label && <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 7 }}>{label}</div>}
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+                {chips.map((c, j) => (
+                  <span
+                    key={j}
+                    style={{
+                      fontSize: 13, background: "var(--accent-soft)", color: "var(--accent-ink)",
+                      padding: "4px 10px", borderRadius: 999, lineHeight: 1.35,
+                    }}
+                  >
+                    {c}
+                  </span>
+                ))}
+              </div>
+            </div>
+          );
+        }
         return (
           <div key={i} style={{ fontSize: 14, lineHeight: 1.5, color: "var(--text)" }}>{t}</div>
         );
@@ -254,7 +283,21 @@ function HealthAccordion({ h }: { h: HealthEntry }) {
       <div className="acc-body">
         {h.description && <div>{h.description}</div>}
         {h.medications && <div>Médicaments : {h.medications}</div>}
-        {h.attachments.length > 0 && <div>{h.attachments.length} pièce(s) jointe(s)</div>}
+        {h.attachments.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: h.description || h.medications ? 8 : 0 }}>
+            {h.attachments.map((a) =>
+              a.type.startsWith("image") ? (
+                <a key={a.id} href={a.dataUrl} target="_blank" rel="noreferrer">
+                  <img src={a.dataUrl} alt={a.name} style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 10, border: "0.5px solid var(--line)" }} />
+                </a>
+              ) : (
+                <a key={a.id} href={a.dataUrl} download={a.name} className="chip">
+                  <Icon name="file" size={14} /> {a.name.length > 16 ? a.name.slice(0, 14) + "…" : a.name}
+                </a>
+              ),
+            )}
+          </div>
+        )}
         {!h.description && !h.medications && !h.attachments.length && (
           <div style={{ color: "var(--faint)" }}>Aucun détail supplémentaire.</div>
         )}

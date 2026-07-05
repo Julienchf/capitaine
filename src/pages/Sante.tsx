@@ -52,18 +52,29 @@ export default function Sante() {
   const [editEntry, setEditEntry] = useState<HealthEntry | "new" | null>(null);
   const [detailEntry, setDetailEntry] = useState<HealthEntry | null>(null);
   const [search, setSearch] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
+  const [amountMin, setAmountMin] = useState("");
+  const [amountMax, setAmountMax] = useState("");
+  const [showAllHealth, setShowAllHealth] = useState(false);
 
   const statuses = allCareStatuses(data);
   const q = search.trim().toLowerCase();
+  const minA = amountMin ? parseFloat(amountMin) : null;
+  const maxA = amountMax ? parseFloat(amountMax) : null;
   const health = [...data.health]
     .sort((a, b) => b.date.localeCompare(a.date))
-    .filter((h) =>
-      !q
-        ? true
-        : [h.title, h.description, h.medications, formatDate(h.date), h.cost ? String(h.cost) : ""]
-            .filter(Boolean)
-            .some((f) => f!.toLowerCase().includes(q)),
-    );
+    .filter((h) => {
+      if (q && ![h.title, h.description, h.medications, formatDate(h.date)].filter(Boolean).some((f) => f!.toLowerCase().includes(q))) return false;
+      if (dateFrom && h.date < dateFrom) return false;
+      if (dateTo && h.date > dateTo) return false;
+      if (minA != null && (h.cost ?? 0) < minA) return false;
+      if (maxA != null && (h.cost ?? 0) > maxA) return false;
+      return true;
+    });
+  const anyHealthFilter = !!(q || dateFrom || dateTo || amountMin || amountMax);
+  const shownHealth = anyHealthFilter || showAllHealth ? health : health.slice(0, 5);
 
   return (
     <div className="page">
@@ -161,21 +172,67 @@ export default function Sante() {
       {tab === "carnet" && (
         <>
           {data.health.length > 0 && (
-            <div style={{ position: "relative", marginBottom: 14 }}>
-              <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--faint)" }}>
-                <Icon name="search" size={18} />
-              </span>
-              <input
-                placeholder="Rechercher (pépin, date, médicament…)"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                style={{
-                  width: "100%", padding: "11px 12px 11px 38px",
-                  border: "0.5px solid var(--line-strong)", borderRadius: 10, background: "var(--surface)",
-                }}
-              />
-            </div>
+            <>
+              <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
+                <div style={{ position: "relative", flex: 1 }}>
+                  <span style={{ position: "absolute", left: 12, top: "50%", transform: "translateY(-50%)", color: "var(--faint)" }}>
+                    <Icon name="search" size={18} />
+                  </span>
+                  <input
+                    placeholder="Rechercher…"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    style={{ width: "100%", padding: "11px 12px 11px 38px", border: "0.5px solid var(--line-strong)", borderRadius: 10, background: "var(--surface)" }}
+                  />
+                </div>
+                <button
+                  className={`btn ${filtersOpen || dateFrom || dateTo || amountMin || amountMax ? "primary" : ""}`}
+                  style={{ padding: "0 14px", flexShrink: 0 }}
+                  onClick={() => setFiltersOpen((v) => !v)}
+                >
+                  <Icon name="search" size={16} /> Filtres
+                </button>
+              </div>
+
+              {filtersOpen && (
+                <div className="card card-pad" style={{ marginBottom: 12 }}>
+                  <div className="grid-2">
+                    <div className="field" style={{ marginTop: 0 }}>
+                      <label>Du</label>
+                      <input type="date" value={dateFrom} onChange={(e) => setDateFrom(e.target.value)} />
+                    </div>
+                    <div className="field" style={{ marginTop: 0 }}>
+                      <label>Au</label>
+                      <input type="date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="grid-2" style={{ marginTop: 10 }}>
+                    <div className="field" style={{ marginTop: 0 }}>
+                      <label>Coût min (€)</label>
+                      <input type="number" inputMode="decimal" placeholder="0" value={amountMin} onChange={(e) => setAmountMin(e.target.value)} />
+                    </div>
+                    <div className="field" style={{ marginTop: 0 }}>
+                      <label>Coût max (€)</label>
+                      <input type="number" inputMode="decimal" placeholder="∞" value={amountMax} onChange={(e) => setAmountMax(e.target.value)} />
+                    </div>
+                  </div>
+                  {anyHealthFilter && (
+                    <button
+                      className="btn ghost block"
+                      style={{ marginTop: 12, color: "var(--muted)" }}
+                      onClick={() => { setSearch(""); setDateFrom(""); setDateTo(""); setAmountMin(""); setAmountMax(""); }}
+                    >
+                      Réinitialiser les filtres
+                    </button>
+                  )}
+                </div>
+              )}
+            </>
           )}
+
+          <button className="btn primary block" style={{ marginBottom: 14 }} onClick={() => setEditEntry("new")}>
+            <Icon name="plus" size={18} /> Ajouter au carnet
+          </button>
 
           {data.health.length === 0 ? (
             <div className="empty">
@@ -185,37 +242,45 @@ export default function Sante() {
               Ajoutez une consultation, un traitement, une ordonnance.
             </div>
           ) : health.length === 0 ? (
-            <div className="empty">Aucun résultat pour « {search} ».</div>
+            <div className="empty">Aucun résultat pour ces filtres.</div>
           ) : (
-            <div className="grid-2">
-              {health.map((h) => (
-                <EventCard
-                  key={h.id}
-                  title={h.title}
-                  dateLabel={formatDate(h.date)}
-                  extra={
-                    <>
-                      {h.cost != null && <CostChip value={h.cost} />}
-                      {h.attachments.length > 0 && (
-                        <span
-                          style={{
-                            fontSize: 11, color: "var(--accent-ink)", background: "var(--accent-soft)",
-                            padding: "2px 7px", borderRadius: 999, display: "flex", alignItems: "center", gap: 3,
-                          }}
-                        >
-                          <Icon name="file" size={12} /> {h.attachments.length}
-                        </span>
-                      )}
-                    </>
-                  }
-                  onClick={() => setDetailEntry(h)}
-                />
-              ))}
-            </div>
+            <>
+              <div className="grid-2">
+                {shownHealth.map((h) => (
+                  <EventCard
+                    key={h.id}
+                    title={h.title}
+                    dateLabel={formatDate(h.date)}
+                    extra={
+                      <>
+                        {h.cost != null && <CostChip value={h.cost} />}
+                        {h.attachments.length > 0 && (
+                          <span
+                            style={{
+                              fontSize: 11, color: "var(--accent-ink)", background: "var(--accent-soft)",
+                              padding: "2px 7px", borderRadius: 999, display: "flex", alignItems: "center", gap: 3,
+                            }}
+                          >
+                            <Icon name="file" size={12} /> {h.attachments.length}
+                          </span>
+                        )}
+                      </>
+                    }
+                    onClick={() => setDetailEntry(h)}
+                  />
+                ))}
+              </div>
+              {!anyHealthFilter && health.length > 5 && (
+                <button
+                  className="btn ghost block"
+                  style={{ marginTop: 10, color: "var(--accent-ink)" }}
+                  onClick={() => setShowAllHealth((v) => !v)}
+                >
+                  {showAllHealth ? "Réduire" : `Voir les ${health.length - 5} autres`}
+                </button>
+              )}
+            </>
           )}
-          <button className="btn primary block" style={{ marginTop: 14 }} onClick={() => setEditEntry("new")}>
-            <Icon name="plus" size={18} /> Ajouter au carnet
-          </button>
         </>
       )}
 

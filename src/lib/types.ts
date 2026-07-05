@@ -32,6 +32,7 @@ export type ExpenseCategory =
   | "hygiene"
   | "accessoires"
   | "toilettage"
+  | "dogsitting"
   | "assurance"
   | "autre";
 
@@ -214,6 +215,7 @@ export const EXPENSE_META: Record<
   hygiene: { label: "Produits d'hygiène", icon: "🧴" },
   accessoires: { label: "Accessoires", icon: "🎽" },
   toilettage: { label: "Toilettage", icon: "✂️" },
+  dogsitting: { label: "Dogsitting", icon: "🏠" },
   assurance: { label: "Assurance", icon: "🛡️" },
   autre: { label: "Autre", icon: "🐾" },
 };
