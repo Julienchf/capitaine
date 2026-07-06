@@ -11,6 +11,7 @@ import type { CareKind } from "../lib/types";
 import {
   ageText,
   currentMonthKey,
+  endOfMonthISO,
   formatShort,
   humanAge,
   monthLabel,
@@ -33,9 +34,8 @@ export default function Home() {
   const nextRdv = nextAppointment(data);
 
   const mk = currentMonthKey();
-  const [y, m] = mk.split("-").map(Number);
   const first = `${mk}-01`;
-  const last = new Date(y, m, 0).toISOString().slice(0, 10);
+  const last = endOfMonthISO(mk);
   const spent = budgetTotal(budgetItems(data, first, last));
   const budget = data.monthlyBudget;
   const pct = Math.min(100, Math.round((spent / budget) * 100));

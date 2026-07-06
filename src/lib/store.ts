@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import type { AppData } from "./types";
 import { DEFAULT_CARE_CONFIG } from "./types";
+import { ARRAY_KEYS, mergeData } from "./merge";
 import { addDays, todayISO } from "./dates";
 
 const KEY = "capitaine.data.v1";
@@ -129,6 +130,31 @@ function normalize(d: AppData): AppData {
   if (d.profile && !d.profile.feeding && !d.profile.outings && !d.profile.commands && !d.profile.rules) {
     Object.assign(d.profile, GUIDE);
   }
+  // Hardening: every collection must be an array (a malformed doc from an
+  // old app version must never crash the app).
+  for (const key of ARRAY_KEYS) {
+    if (!Array.isArray((d as unknown as Record<string, unknown>)[key])) {
+      (d as unknown as Record<string, unknown>)[key] = [];
+    }
+  }
+  d.health.forEach((h) => {
+    if (!Array.isArray(h.attachments)) h.attachments = [];
+  });
+  // Sync bookkeeping fields.
+  if (!d.itemTs || typeof d.itemTs !== "object") d.itemTs = {};
+  if (!d.tombstones || typeof d.tombstones !== "object") d.tombstones = {};
+  // Prune: tombstones older than 90 days, and timestamps of vanished items.
+  const cutoff = Date.now() - 90 * 86400000;
+  for (const [id, ts] of Object.entries(d.tombstones)) {
+    if (ts < cutoff) delete d.tombstones[id];
+  }
+  const liveIds = new Set<string>();
+  for (const key of ARRAY_KEYS) {
+    for (const item of d[key] as { id: string }[]) liveIds.add(item.id);
+  }
+  for (const id of Object.keys(d.itemTs)) {
+    if (!liveIds.has(id)) delete d.itemTs[id];
+  }
   return d;
 }
 
@@ -148,20 +174,73 @@ function load(): AppData {
   return s;
 }
 
+let storageFullWarned = false;
+
 function persist() {
   try {
     localStorage.setItem(KEY, JSON.stringify(data));
-  } catch {
-    /* ignore */
+  } catch (e) {
+    // Storage full (large attachments): surface it instead of failing silently
+    // — a silently-stale local copy is how data gets lost.
+    console.error("Stockage local plein ou indisponible :", e);
+    if (!storageFullWarned) {
+      storageFullWarned = true;
+      setTimeout(() => {
+        alert(
+          "⚠️ Le stockage local de l'appareil est plein : les pièces jointes sont trop lourdes. " +
+            "Les données restent synchronisées dans le cloud, mais pense à supprimer quelques grosses pièces jointes.",
+        );
+      }, 100);
+    }
   }
   listeners.forEach((l) => l());
   if (pushHandler && !applyingRemote) pushHandler(data);
 }
 
-/** Mutate the store with an updater and notify subscribers. */
+function deepClone(d: AppData): AppData {
+  return typeof structuredClone === "function"
+    ? structuredClone(d)
+    : (JSON.parse(JSON.stringify(d)) as AppData);
+}
+
+/**
+ * Mutate the store with an updater and notify subscribers.
+ * Automatically maintains the sync bookkeeping used by mergeData():
+ * - stamps `itemTs[id]` for every added or edited item,
+ * - records a tombstone for every removed item.
+ */
 export function update(mutator: (draft: AppData) => void) {
-  const next: AppData = JSON.parse(JSON.stringify(data));
+  const prev = data;
+  const next = deepClone(data);
   mutator(next);
+
+  const now = Date.now();
+  const itemTs = { ...(next.itemTs ?? {}) };
+  const tombstones = { ...(next.tombstones ?? {}) };
+  for (const key of ARRAY_KEYS) {
+    const prevArr = (prev[key] ?? []) as { id: string }[];
+    const nextArr = (next[key] ?? []) as { id: string }[];
+    const prevJson = new Map(prevArr.map((i) => [i.id, JSON.stringify(i)]));
+    const nextIds = new Set<string>();
+    for (const item of nextArr) {
+      nextIds.add(item.id);
+      const before = prevJson.get(item.id);
+      if (before === undefined || before !== JSON.stringify(item)) {
+        itemTs[item.id] = now;
+        delete tombstones[item.id];
+      }
+    }
+    for (const id of prevJson.keys()) {
+      if (!nextIds.has(id)) {
+        tombstones[id] = now;
+        delete itemTs[id];
+      }
+    }
+  }
+  next.itemTs = itemTs;
+  next.tombstones = tombstones;
+  next.updatedAt = now;
+
   data = next;
   persist();
 }
@@ -182,4 +261,9 @@ export function useData(): AppData {
 export function resetData() {
   data = seed();
   persist();
+}
+
+// Dev-only hook so merge/sync behaviour can be tested from the console.
+if (import.meta.env.DEV) {
+  (window as unknown as Record<string, unknown>).__cap = { getData, update, mergeData, resetData };
 }

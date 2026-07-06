@@ -165,6 +165,12 @@ export interface AppData {
   questions: VetQuestion[];
   /** Token of the public read-only share link (if generated). */
   shareToken?: string;
+  /** Last local edit (ms epoch) — used to pick scalar fields during merge. */
+  updatedAt?: number;
+  /** Per-item last-edit timestamps (id → ms epoch), maintained automatically. */
+  itemTs?: Record<string, number>;
+  /** Deletion tombstones (id → ms epoch) so deletions sync without resurrect. */
+  tombstones?: Record<string, number>;
 }
 
 export const CARE_META: Record<

@@ -9,6 +9,7 @@ import type { ExpenseCategory } from "../lib/types";
 const SOURCE_LABEL: Record<string, string> = { soin: "Soin", sante: "Santé", stock: "Stock" };
 import {
   currentMonthKey,
+  endOfMonthISO,
   formatShort,
   monthLabel,
   startOfYearISO,
@@ -36,9 +37,8 @@ export default function Budget() {
 
   const range = useMemo(() => {
     if (period === "month") {
-      const [y, m] = monthK.split("-").map(Number);
       const first = `${monthK}-01`;
-      const last = new Date(y, m, 0).toISOString().slice(0, 10);
+      const last = endOfMonthISO(monthK);
       return { from: first, to: last, label: monthLabel(monthK) };
     }
     if (period === "year") {

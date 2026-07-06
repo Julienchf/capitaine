@@ -1,5 +1,18 @@
+/**
+ * Format a Date as yyyy-mm-dd using its LOCAL components.
+ * Never use Date.toISOString() for this: it converts to UTC, which in a
+ * positive-offset timezone (France) shifts the calendar day backwards and
+ * makes "today" or an end-of-month day land on the wrong date.
+ */
+export function toISODate(d: Date): string {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
 export function todayISO(): string {
-  return new Date().toISOString().slice(0, 10);
+  return toISODate(new Date());
 }
 
 export function parseISO(iso: string): Date {
@@ -10,7 +23,13 @@ export function parseISO(iso: string): Date {
 export function addDays(iso: string, days: number): string {
   const d = parseISO(iso);
   d.setDate(d.getDate() + days);
-  return d.toISOString().slice(0, 10);
+  return toISODate(d);
+}
+
+/** Last calendar day of the month a yyyy-mm key points to (local, tz-safe). */
+export function endOfMonthISO(monthKey: string): string {
+  const [y, m] = monthKey.split("-").map(Number);
+  return toISODate(new Date(y, m, 0));
 }
 
 export function daysBetween(fromISO: string, toISO: string): number {

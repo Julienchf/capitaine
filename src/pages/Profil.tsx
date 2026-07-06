@@ -165,15 +165,17 @@ export default function Profil() {
         <span className="pill muted">v2</span>
       </div>
 
-      <button
-        className="btn danger-text block"
-        style={{ marginTop: 24 }}
-        onClick={() => {
-          if (confirm("Réinitialiser toutes les données de démonstration ?")) resetData();
-        }}
-      >
-        Réinitialiser les données
-      </button>
+      {!isSyncConfigured && (
+        <button
+          className="btn danger-text block"
+          style={{ marginTop: 24 }}
+          onClick={() => {
+            if (confirm("Réinitialiser toutes les données de démonstration ?")) resetData();
+          }}
+        >
+          Réinitialiser les données
+        </button>
+      )}
 
       {isSyncConfigured && (
         <button
