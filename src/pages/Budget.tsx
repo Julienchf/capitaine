@@ -4,7 +4,9 @@ import Sheet from "../components/Sheet";
 import { useData, update, uid } from "../lib/store";
 import { budgetItems, budgetTotal, periodBudget } from "../lib/selectors";
 import { EXPENSE_META } from "../lib/types";
-import type { ExpenseCategory } from "../lib/types";
+import type { ExpenseCategory, Attachment } from "../lib/types";
+import FactureLoader from "../components/FactureLoader";
+import { AttachmentChips } from "../components/Attachments";
 
 const SOURCE_LABEL: Record<string, string> = { soin: "Soin", sante: "Santé", stock: "Stock" };
 import {
@@ -244,6 +246,7 @@ function ExpenseSheet({ expense, onClose }: { expense: Expense | null; onClose: 
   const [category, setCategory] = useState<ExpenseCategory>(expense?.category ?? "veto");
   const [label, setLabel] = useState(expense?.label ?? "");
   const [date, setDate] = useState(expense?.date ?? todayISO());
+  const [attachments, setAttachments] = useState<Attachment[]>(expense?.attachments ?? []);
 
   function save() {
     const a = parseFloat(amount);
@@ -256,9 +259,17 @@ function ExpenseSheet({ expense, onClose }: { expense: Expense | null; onClose: 
           t.category = category;
           t.label = label || undefined;
           t.date = date;
+          t.attachments = attachments.length ? attachments : undefined;
         }
       } else {
-        d.expenses.push({ id: uid(), amount: a, category, label: label || undefined, date });
+        d.expenses.push({
+          id: uid(),
+          amount: a,
+          category,
+          label: label || undefined,
+          date,
+          attachments: attachments.length ? attachments : undefined,
+        });
       }
     });
     onClose();
@@ -276,12 +287,22 @@ function ExpenseSheet({ expense, onClose }: { expense: Expense | null; onClose: 
 
   return (
     <Sheet title={expense ? "Modifier la dépense" : "Nouvelle dépense"} onClose={onClose}>
+      <FactureLoader
+        onAttachment={(a) => setAttachments((prev) => [...prev, a])}
+        onFields={(f) => {
+          if (f.amount && f.amount > 0) setAmount(String(f.amount));
+          if (f.category) setCategory(f.category);
+          if (f.label) setLabel(f.label);
+          if (f.date) setDate(f.date);
+        }}
+      />
+      <AttachmentChips items={attachments} onRemove={(id) => setAttachments((x) => x.filter((y) => y.id !== id))} />
+
       <div className="field">
         <label>Montant (€)</label>
         <input
           type="number"
           inputMode="decimal"
-          autoFocus
           placeholder="0"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}

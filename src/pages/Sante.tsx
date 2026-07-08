@@ -6,6 +6,8 @@ import TreatmentSheet from "../components/TreatmentSheet";
 import TraitementsTab from "../components/TraitementsTab";
 import RdvTab from "../components/RdvTab";
 import EventCard from "../components/EventCard";
+import FactureLoader from "../components/FactureLoader";
+import { AttachmentChips, AttachmentView } from "../components/Attachments";
 import { useData, update, uid } from "../lib/store";
 import { allCareStatuses, careInterval } from "../lib/selectors";
 import { CARE_META, ANTIPARASITE_FORMS } from "../lib/types";
@@ -415,6 +417,7 @@ function CareEventSheet({
   const [date, setDate] = useState(event?.date ?? todayISO());
   const [cost, setCost] = useState(event?.cost != null ? String(event.cost) : "");
   const [note, setNote] = useState(event?.note ?? "");
+  const [attachments, setAttachments] = useState<Attachment[]>(event?.attachments ?? []);
   const meta = CARE_META[kind];
 
   function save() {
@@ -425,6 +428,7 @@ function CareEventSheet({
           t.date = date;
           t.cost = cost ? parseFloat(cost) : undefined;
           t.note = note || undefined;
+          t.attachments = attachments.length ? attachments : undefined;
         }
       } else {
         d.careEvents.push({
@@ -433,6 +437,7 @@ function CareEventSheet({
           date,
           cost: cost ? parseFloat(cost) : undefined,
           note: note || undefined,
+          attachments: attachments.length ? attachments : undefined,
         });
       }
     });
@@ -449,6 +454,16 @@ function CareEventSheet({
 
   return (
     <Sheet title={`${event ? "Modifier" : "Noter"} : ${meta.label}`} onClose={onClose}>
+      <FactureLoader
+        onAttachment={(a) => setAttachments((prev) => [...prev, a])}
+        onFields={(f) => {
+          if (f.date) setDate(f.date);
+          if (f.amount && f.amount > 0) setCost(String(f.amount));
+          const n = f.medications || f.label || f.vendor;
+          if (n) setNote(n);
+        }}
+      />
+      <AttachmentChips items={attachments} onRemove={(id) => setAttachments((x) => x.filter((y) => y.id !== id))} />
       <div className="field">
         <label>Date du soin</label>
         <input type="date" value={date} onChange={(e) => setDate(e.target.value)} />
@@ -548,6 +563,16 @@ function HealthSheet({ entry, onClose }: { entry: HealthEntry | null; onClose: (
   return (
     <>
       <Sheet title={entry ? "Modifier" : "Nouveau pépin de santé"} onClose={onClose}>
+        <FactureLoader
+          onAttachment={(a) => setAttachments((prev) => [...prev, a])}
+          onFields={(f) => {
+            if (f.label && !title.trim()) setTitle(f.label);
+            if (f.date) setDate(f.date);
+            if (f.amount && f.amount > 0) setCost(String(f.amount));
+            const desc = [f.summary, f.medications ? `Médicaments : ${f.medications}` : ""].filter(Boolean).join("\n");
+            if (desc && !description.trim()) setDescription(desc);
+          }}
+        />
         <div className="field">
           <label>Intitulé</label>
           <input placeholder="ex. Boiterie patte avant" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -673,6 +698,7 @@ function CareEventDetailSheet({
         {event.cost != null && <DetailRow label="Coût" value={euro(event.cost)} />}
         {event.note && <DetailBlock label="Note" value={event.note} />}
       </div>
+      <AttachmentView items={event.attachments} />
       <button className="btn primary block" style={{ marginTop: 20 }} onClick={onEdit}>
         <Icon name="edit" size={17} /> Modifier
       </button>

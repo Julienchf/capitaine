@@ -1,7 +1,9 @@
 import { useState } from "react";
 import Sheet from "./Sheet";
+import FactureLoader from "./FactureLoader";
+import { AttachmentChips } from "./Attachments";
 import { update, uid } from "../lib/store";
-import type { Treatment } from "../lib/types";
+import type { Treatment, Attachment } from "../lib/types";
 import { FREQUENCY_PRESETS, TIMING_PRESETS } from "../lib/types";
 import { todayISO } from "../lib/dates";
 
@@ -31,9 +33,11 @@ export default function TreatmentSheet({
   const [endDate, setEndDate] = useState(treatment?.endDate ?? "");
   const [lifelong, setLifelong] = useState(treatment ? !treatment.endDate : false);
   const [notes, setNotes] = useState(treatment?.notes ?? "");
+  const [attachments, setAttachments] = useState<Attachment[]>(treatment?.attachments ?? []);
 
   function save() {
     if (!medication.trim()) return;
+    const atts = attachments.length ? attachments : undefined;
     if (onSubmit) {
       onSubmit({
         healthEntryId: draft?.healthEntryId,
@@ -44,6 +48,7 @@ export default function TreatmentSheet({
         startDate,
         endDate: lifelong ? undefined : endDate || undefined,
         notes: notes || undefined,
+        attachments: atts,
       });
       onClose();
       return;
@@ -59,6 +64,7 @@ export default function TreatmentSheet({
           t.startDate = startDate;
           t.endDate = lifelong ? undefined : endDate || undefined;
           t.notes = notes || undefined;
+          t.attachments = atts;
         }
       } else {
         d.treatments.push({
@@ -71,6 +77,7 @@ export default function TreatmentSheet({
           startDate,
           endDate: lifelong ? undefined : endDate || undefined,
           notes: notes || undefined,
+          attachments: atts,
         });
       }
     });
@@ -79,6 +86,15 @@ export default function TreatmentSheet({
 
   return (
     <Sheet title={treatment ? "Modifier le traitement" : "Nouveau traitement"} onClose={onClose}>
+      <FactureLoader
+        onAttachment={(a) => setAttachments((prev) => [...prev, a])}
+        onFields={(f) => {
+          if (f.medications && !medication.trim()) setMedication(f.medications.split(/[,\n;]/)[0].trim());
+          if (f.date) setStartDate(f.date);
+          if (f.medications && !notes.trim()) setNotes(f.medications);
+        }}
+      />
+      <AttachmentChips items={attachments} onRemove={(id) => setAttachments((x) => x.filter((y) => y.id !== id))} />
       <div className="field">
         <label>Médicament</label>
         <input placeholder="ex. Metacam" value={medication} onChange={(e) => setMedication(e.target.value)} />

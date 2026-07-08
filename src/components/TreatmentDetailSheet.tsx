@@ -1,6 +1,7 @@
 import { useState } from "react";
 import Sheet from "./Sheet";
 import Icon from "./Icon";
+import { AttachmentView } from "./Attachments";
 import { update } from "../lib/store";
 import { isTreatmentActive } from "../lib/selectors";
 import type { Treatment } from "../lib/types";
@@ -104,6 +105,7 @@ export default function TreatmentDetailSheet({
           </div>
         )}
       </div>
+      <AttachmentView items={t.attachments} />
 
       <button className="btn primary block" style={{ marginTop: 20 }} onClick={onEdit}>
         <Icon name="edit" size={17} /> Modifier

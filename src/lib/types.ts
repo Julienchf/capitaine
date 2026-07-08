@@ -6,6 +6,7 @@ export interface CareEvent {
   date: string; // ISO yyyy-mm-dd
   cost?: number;
   note?: string;
+  attachments?: Attachment[];
 }
 
 export interface Attachment {
@@ -42,6 +43,7 @@ export interface Expense {
   amount: number;
   category: ExpenseCategory;
   label?: string;
+  attachments?: Attachment[];
 }
 
 export type StockKind = "croquettes" | "friandises" | "sacs" | "autre";
@@ -110,6 +112,7 @@ export interface Treatment {
   followUpDone?: boolean;
   resolved?: boolean;
   stopReason?: string;
+  attachments?: Attachment[];
 }
 
 /** Days before the due date at which a reminder should fire. */
