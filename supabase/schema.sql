@@ -56,3 +56,29 @@ create policy "public read shares" on public.shares
 drop policy if exists "members write shares" on public.shares;
 create policy "members write shares" on public.shares
   for all using (public.is_member()) with check (public.is_member());
+
+-- 7. Historique de versions (filet de sécurité anti-perte de données)
+-- À chaque sauvegarde, l'app dépose ici un instantané horodaté et ne garde
+-- que les plus récents. Permet de restaurer une version antérieure d'un clic.
+create table if not exists public.household_history (
+  id bigint generated always as identity primary key,
+  household_id text not null,
+  data jsonb not null,
+  created_at timestamptz not null default now()
+);
+create index if not exists household_history_by_time
+  on public.household_history (household_id, created_at desc);
+
+alter table public.household_history enable row level security;
+
+drop policy if exists "members read history" on public.household_history;
+create policy "members read history" on public.household_history
+  for select using (public.is_member());
+
+drop policy if exists "members insert history" on public.household_history;
+create policy "members insert history" on public.household_history
+  for insert with check (public.is_member());
+
+drop policy if exists "members delete history" on public.household_history;
+create policy "members delete history" on public.household_history
+  for delete using (public.is_member());

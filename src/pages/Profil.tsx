@@ -1,11 +1,14 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "../components/Icon";
 import ImageCropper from "../components/ImageCropper";
-import { useData, update, resetData } from "../lib/store";
-import { ageText, humanAge, formatDate } from "../lib/dates";
+import Sheet from "../components/Sheet";
+import { useData, update, resetData, getData, mergeInData } from "../lib/store";
+import { ageText, humanAge, formatDate, todayISO } from "../lib/dates";
 import { fileToDataUrl } from "../lib/format";
 import { supabase, isSyncConfigured } from "../lib/supabase";
+import { listSnapshots, getSnapshot, type SnapshotMeta } from "../lib/history";
+import type { AppData } from "../lib/types";
 
 export default function Profil() {
   const data = useData();
@@ -19,10 +22,42 @@ export default function Profil() {
     });
   }
 
+  const [historyOpen, setHistoryOpen] = useState(false);
+
   async function onPhoto(files: FileList | null) {
     if (!files?.[0]) return;
     const url = await fileToDataUrl(files[0]);
     setCropSrc(url);
+  }
+
+  function exportBackup() {
+    const blob = new Blob([JSON.stringify(getData(), null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `capitaine-sauvegarde-${todayISO()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  async function importBackup(files: FileList | null) {
+    const file = files?.[0];
+    if (!file) return;
+    try {
+      const parsed = JSON.parse(await file.text()) as AppData;
+      if (!parsed || typeof parsed !== "object" || !parsed.profile) {
+        alert("Ce fichier n'est pas une sauvegarde Capitaine valide.");
+        return;
+      }
+      const gained = mergeInData(parsed);
+      alert(
+        gained > 0
+          ? `Sauvegarde importée : ${gained} élément(s) restauré(s). ✅`
+          : "Sauvegarde importée. Aucun élément manquant à ajouter.",
+      );
+    } catch {
+      alert("Impossible de lire ce fichier de sauvegarde.");
+    }
   }
 
   return (
@@ -177,6 +212,58 @@ export default function Profil() {
         </button>
       )}
 
+      <div className="section-title">Sauvegarde &amp; sécurité</div>
+      <div className="card card-pad">
+        <div className="meta" style={{ marginBottom: 12, lineHeight: 1.5 }}>
+          Tes données sont synchronisées et versionnées dans le cloud. Tu peux
+          aussi en garder une copie sur ton appareil.
+        </div>
+
+        {isSyncConfigured && (
+          <button
+            className="row"
+            style={{ width: "100%", textAlign: "left", marginBottom: 8 }}
+            onClick={() => setHistoryOpen(true)}
+          >
+            <div className="ic-badge ic-accent"><Icon name="clock" size={20} /></div>
+            <div className="grow">
+              <div className="title">Historique des versions</div>
+              <div className="meta">Restaurer une version antérieure</div>
+            </div>
+            <Icon name="chevron" size={18} className="ic-badge" />
+          </button>
+        )}
+
+        <button
+          className="row"
+          style={{ width: "100%", textAlign: "left", marginBottom: 8 }}
+          onClick={exportBackup}
+        >
+          <div className="ic-badge ic-muted"><Icon name="file" size={20} /></div>
+          <div className="grow">
+            <div className="title">Exporter une sauvegarde</div>
+            <div className="meta">Télécharger un fichier .json</div>
+          </div>
+        </button>
+
+        <label className="row" style={{ width: "100%", textAlign: "left", cursor: "pointer", margin: 0 }}>
+          <div className="ic-badge ic-muted"><Icon name="share" size={20} /></div>
+          <div className="grow">
+            <div className="title">Importer une sauvegarde</div>
+            <div className="meta">Restaurer depuis un fichier .json</div>
+          </div>
+          <input
+            type="file"
+            accept="application/json,.json"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              void importBackup(e.target.files);
+              e.target.value = "";
+            }}
+          />
+        </label>
+      </div>
+
       {isSyncConfigured && (
         <button
           className="btn block"
@@ -186,6 +273,8 @@ export default function Profil() {
           Se déconnecter
         </button>
       )}
+
+      {historyOpen && <HistorySheet onClose={() => setHistoryOpen(false)} />}
 
       {cropSrc && (
         <ImageCropper
@@ -198,5 +287,76 @@ export default function Profil() {
         />
       )}
     </div>
+  );
+}
+
+function HistorySheet({ onClose }: { onClose: () => void }) {
+  const [snaps, setSnaps] = useState<SnapshotMeta[] | null>(null);
+  const [busy, setBusy] = useState<number | null>(null);
+
+  useEffect(() => {
+    void listSnapshots().then(setSnaps);
+  }, []);
+
+  function fmt(iso: string): string {
+    const d = new Date(iso);
+    const date = d.toLocaleDateString("fr-FR", { day: "numeric", month: "short" });
+    const time = d.toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" });
+    return `${date} à ${time}`;
+  }
+
+  async function restore(s: SnapshotMeta) {
+    const total = s.counts.health + s.counts.expenses + s.counts.careEvents + s.counts.treatments + s.counts.appointments;
+    if (!confirm(`Restaurer la version du ${fmt(s.created_at)} ?\nElle contient ${total} élément(s). Ils seront réintégrés à tes données actuelles (rien ne sera supprimé).`)) return;
+    setBusy(s.id);
+    const doc = await getSnapshot(s.id);
+    setBusy(null);
+    if (!doc) {
+      alert("Impossible de charger cette version.");
+      return;
+    }
+    const gained = mergeInData(doc);
+    alert(gained > 0 ? `Version restaurée : ${gained} élément(s) réintégré(s). ✅` : "Version restaurée. Tes données étaient déjà à jour.");
+    onClose();
+  }
+
+  return (
+    <Sheet title="Historique des versions" onClose={onClose}>
+      {snaps === null ? (
+        <div className="meta" style={{ padding: "12px 0" }}>Chargement…</div>
+      ) : snaps.length === 0 ? (
+        <div className="empty">
+          <Icon name="clock" size={34} className="ic" />
+          Aucune version enregistrée pour l'instant. Les sauvegardes automatiques
+          apparaîtront ici au fil de tes modifications.
+        </div>
+      ) : (
+        <>
+          <div className="meta" style={{ marginBottom: 10, lineHeight: 1.5 }}>
+            Chaque ligne est un instantané automatique. Choisis-en une pour
+            réintégrer son contenu.
+          </div>
+          {snaps.map((s) => (
+            <div className="row" key={s.id} style={{ marginBottom: 8 }}>
+              <div className="grow">
+                <div className="title">{fmt(s.created_at)}</div>
+                <div className="meta">
+                  {s.counts.health} pépin(s) · {s.counts.expenses} dépense(s) ·{" "}
+                  {s.counts.careEvents} soin(s) · {s.counts.appointments} RDV
+                </div>
+              </div>
+              <button
+                className="btn ghost"
+                style={{ color: "var(--accent-ink)" }}
+                disabled={busy !== null}
+                onClick={() => void restore(s)}
+              >
+                {busy === s.id ? "…" : "Restaurer"}
+              </button>
+            </div>
+          ))}
+        </>
+      )}
+    </Sheet>
   );
 }

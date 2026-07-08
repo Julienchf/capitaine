@@ -263,6 +263,21 @@ export function resetData() {
   persist();
 }
 
+/**
+ * Merge an external document (an imported backup file, or a restored history
+ * snapshot) INTO the current data — union, never a wipe. The result is
+ * persisted and pushed to the cloud so it propagates to the other device.
+ * Returns how many items were gained, for user feedback.
+ */
+export function mergeInData(incoming: AppData): number {
+  const before = ARRAY_KEYS.reduce((n, k) => n + (data[k]?.length ?? 0), 0);
+  const clean = normalize(JSON.parse(JSON.stringify(incoming)) as AppData);
+  data = mergeData(data, clean);
+  persist();
+  const after = ARRAY_KEYS.reduce((n, k) => n + (data[k]?.length ?? 0), 0);
+  return after - before;
+}
+
 // Dev-only hook so merge/sync behaviour can be tested from the console.
 if (import.meta.env.DEV) {
   (window as unknown as Record<string, unknown>).__cap = { getData, update, mergeData, resetData };

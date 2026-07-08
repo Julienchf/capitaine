@@ -2,6 +2,7 @@ import type { AppData } from "./types";
 import { supabase, HOUSEHOLD_ID } from "./supabase";
 import { applyRemote, getData, setPushHandler } from "./store";
 import { mergeData } from "./merge";
+import { saveSnapshot } from "./history";
 import { shareSnapshot } from "./share";
 
 const TABLE = "household";
@@ -126,6 +127,8 @@ async function pushNow(d: AppData): Promise<void> {
     return;
   }
   lastPushedJson = body;
+  // Drop a timestamped snapshot into the history table (safety net).
+  void saveSnapshot(d);
   // Keep the public share snapshot in sync too, if a link exists.
   if (d.shareToken) await publishShare();
 }
