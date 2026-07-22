@@ -52,13 +52,20 @@ export default function Home() {
     stocks.length === 0 ? "Aucun" : lowStock > 0 ? `${lowStock} à racheter` : "À jour";
   const openQuestions = data.questions.filter((q) => !q.done).length;
 
+  const greeting = new Date().getHours() < 18 ? "Bonjour" : "Bonsoir";
+
   return (
     <div className="page">
+      <div className="page-header" style={{ paddingLeft: 0, paddingRight: 0 }}>
+        <h1>{greeting} 👋</h1>
+        <div className="sub">Le carnet de bord de {profile.name}</div>
+      </div>
+
       {/* Hero */}
       <Link
         to="/profil"
         className="card"
-        style={{ display: "flex", alignItems: "center", gap: 14, padding: 16, marginTop: 18 }}
+        style={{ display: "flex", alignItems: "center", gap: 14, padding: 16, marginTop: 4 }}
       >
         <div
           style={{
