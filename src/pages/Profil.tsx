@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import Icon from "../components/Icon";
 import ImageCropper from "../components/ImageCropper";
+import BreedPicker from "../components/BreedPicker";
 import Sheet from "../components/Sheet";
 import { useData, update, resetData, getData, mergeInData } from "../lib/store";
 import { ageText, humanAge, formatDate, todayISO } from "../lib/dates";
@@ -109,7 +110,7 @@ export default function Profil() {
       </div>
       <div className="field">
         <label>Race</label>
-        <input value={profile.breed} onChange={(e) => set("breed", e.target.value)} />
+        <BreedPicker value={profile.breed} onChange={(b) => set("breed", b)} />
       </div>
       <div className="field">
         <label>Date de naissance</label>
