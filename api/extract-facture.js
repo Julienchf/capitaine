@@ -102,8 +102,10 @@ export default async function handler(req) {
     const status = gRes?.status ?? 0;
     let msg;
     if (status === 429) {
-      const secs = retrySeconds(lastDetail);
-      msg = `Trop de scans d'affilée : la limite gratuite de l'IA est atteinte. Réessaie ${secs ? `dans ~${secs} s` : "dans une minute"}.`;
+      const perDay = /per\s*day|RequestsPerDay/i.test(lastDetail);
+      msg = perDay
+        ? "Limite gratuite de l'IA atteinte pour aujourd'hui (le quota se réinitialise chaque jour). En attendant, saisis les champs à la main."
+        : "Trop de scans d'affilée, patiente une minute puis réessaie.";
     } else if (status === 503) {
       msg = "Le service d'analyse est momentanément surchargé, réessaie dans un instant.";
     } else {
