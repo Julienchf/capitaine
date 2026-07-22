@@ -1,5 +1,6 @@
 import Icon from "./Icon";
 import type { Attachment } from "../lib/types";
+import { attachmentSrc } from "../lib/storage";
 
 const clip = (n: string) => (n.length > 18 ? n.slice(0, 16) + "…" : n);
 
@@ -32,15 +33,15 @@ export function AttachmentView({ items, label = "Ordonnances / factures" }: { it
       <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
         {items.map((a) =>
           a.type.startsWith("image") ? (
-            <a key={a.id} href={a.dataUrl} target="_blank" rel="noreferrer">
+            <a key={a.id} href={attachmentSrc(a)} target="_blank" rel="noreferrer">
               <img
-                src={a.dataUrl}
+                src={attachmentSrc(a)}
                 alt={a.name}
                 style={{ width: 84, height: 84, objectFit: "cover", borderRadius: 10, border: "0.5px solid var(--line)" }}
               />
             </a>
           ) : (
-            <a key={a.id} href={a.dataUrl} download={a.name} className="chip">
+            <a key={a.id} href={attachmentSrc(a)} download={a.name} className="chip">
               <Icon name="file" size={15} /> {clip(a.name)}
             </a>
           ),

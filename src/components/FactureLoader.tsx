@@ -1,7 +1,6 @@
 import { useState } from "react";
 import Icon from "./Icon";
-import { uid } from "../lib/store";
-import { fileToDataUrl } from "../lib/format";
+import { fileToAttachment } from "../lib/storage";
 import { extractFacture, type ExtractedFacture } from "../lib/extract";
 import type { Attachment } from "../lib/types";
 
@@ -26,10 +25,9 @@ export default function FactureLoader({
   async function handle(files: FileList | null) {
     const list = files ? Array.from(files) : [];
     if (!list.length) return;
-    // Keep every file as an attachment, whatever the extraction does.
+    // Keep every file as an attachment (uploaded to Storage), whatever the extraction does.
     for (const file of list) {
-      const dataUrl = await fileToDataUrl(file);
-      onAttachment({ id: uid(), name: file.name, dataUrl, type: file.type });
+      onAttachment(await fileToAttachment(file));
     }
     setAnalyzing(true);
     setNote(null);

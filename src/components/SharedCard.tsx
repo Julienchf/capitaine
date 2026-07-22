@@ -4,6 +4,7 @@ import { activeTreatments, allCareStatuses } from "../lib/selectors";
 import { CARE_META, GUIDE_LABELS } from "../lib/types";
 import type { AppData, DogGuide, HealthEntry, Treatment } from "../lib/types";
 import { ageText, formatDate, relativeToToday } from "../lib/dates";
+import { attachmentSrc, photoSrc } from "../lib/storage";
 
 function guideHasContent(g?: DogGuide): boolean {
   return !!g && Object.values(g).some((v) => (Array.isArray(v) ? v.length > 0 : v !== undefined && v !== ""));
@@ -44,8 +45,8 @@ export default function SharedCard({ data }: { data: AppData }) {
             background: "var(--accent-soft)", display: "flex", alignItems: "center", justifyContent: "center",
           }}
         >
-          {profile.photoDataUrl ? (
-            <img src={profile.photoDataUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          {photoSrc(profile) ? (
+            <img src={photoSrc(profile)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           ) : (
             <span style={{ color: "var(--accent-ink)" }}><Icon name="paw" size={26} /></span>
           )}
@@ -444,11 +445,11 @@ function HealthAccordion({ h }: { h: HealthEntry }) {
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginTop: h.description || h.medications ? 8 : 0 }}>
             {h.attachments.map((a) =>
               a.type.startsWith("image") ? (
-                <a key={a.id} href={a.dataUrl} target="_blank" rel="noreferrer">
-                  <img src={a.dataUrl} alt={a.name} style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 10, border: "0.5px solid var(--line)" }} />
+                <a key={a.id} href={attachmentSrc(a)} target="_blank" rel="noreferrer">
+                  <img src={attachmentSrc(a)} alt={a.name} style={{ width: 72, height: 72, objectFit: "cover", borderRadius: 10, border: "0.5px solid var(--line)" }} />
                 </a>
               ) : (
-                <a key={a.id} href={a.dataUrl} download={a.name} className="chip">
+                <a key={a.id} href={attachmentSrc(a)} download={a.name} className="chip">
                   <Icon name="file" size={14} /> {a.name.length > 16 ? a.name.slice(0, 14) + "…" : a.name}
                 </a>
               ),

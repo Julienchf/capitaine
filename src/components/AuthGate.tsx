@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase, isSyncConfigured } from "../lib/supabase";
 import { startSync } from "../lib/sync";
+import { migrateAttachments } from "../lib/storage";
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   // Local-only mode: no project connected yet — run the app as-is.
@@ -25,7 +26,9 @@ function AuthedApp({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     if (session && !synced) {
-      startSync().finally(() => setSynced(true));
+      startSync()
+        .then(() => migrateAttachments())
+        .finally(() => setSynced(true));
     }
   }, [session, synced]);
 

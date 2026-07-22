@@ -82,3 +82,27 @@ create policy "members insert history" on public.household_history
 drop policy if exists "members delete history" on public.household_history;
 create policy "members delete history" on public.household_history
   for delete using (public.is_member());
+
+-- 8. Stockage des pièces jointes (factures, ordonnances, photos)
+-- Les fichiers vivent dans Storage ; le document ne garde qu'un lien léger.
+insert into storage.buckets (id, name, public)
+  values ('attachments', 'attachments', true)
+  on conflict (id) do nothing;
+
+-- Lecture publique (les URL sont aléatoires et non devinables — comme le lien de partage).
+drop policy if exists "public read attachments" on storage.objects;
+create policy "public read attachments" on storage.objects
+  for select using (bucket_id = 'attachments');
+
+-- Écriture réservée aux membres connectés.
+drop policy if exists "members upload attachments" on storage.objects;
+create policy "members upload attachments" on storage.objects
+  for insert with check (bucket_id = 'attachments' and public.is_member());
+
+drop policy if exists "members update attachments" on storage.objects;
+create policy "members update attachments" on storage.objects
+  for update using (bucket_id = 'attachments' and public.is_member());
+
+drop policy if exists "members delete attachments" on storage.objects;
+create policy "members delete attachments" on storage.objects
+  for delete using (bucket_id = 'attachments' and public.is_member());

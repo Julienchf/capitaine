@@ -12,8 +12,13 @@ export interface CareEvent {
 export interface Attachment {
   id: string;
   name: string;
-  dataUrl: string; // base64 data URL (photo or PDF)
   type: string;
+  /** Public URL in Supabase Storage (nouveau, léger). */
+  url?: string;
+  /** Chemin de stockage (pour suppression éventuelle). */
+  path?: string;
+  /** Ancien stockage base64 embarqué (migré vers `url`). */
+  dataUrl?: string;
 }
 
 export interface HealthEntry {
@@ -206,6 +211,8 @@ export interface Profile {
   vetWebsite?: string;
   vetHours?: string;
   photoDataUrl?: string;
+  /** Photo dans Supabase Storage (nouveau, léger). */
+  photoUrl?: string;
   emergencyNote?: string;
   // Guide de garde (mode d'emploi pour la dogsitter)
   feeding?: string;

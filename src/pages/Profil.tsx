@@ -10,6 +10,7 @@ import { ageText, humanAge, formatDate, todayISO } from "../lib/dates";
 import { fileToDataUrl } from "../lib/format";
 import { supabase, isSyncConfigured } from "../lib/supabase";
 import { listSnapshots, getSnapshot, type SnapshotMeta } from "../lib/history";
+import { photoSrc, uploadDataUrl } from "../lib/storage";
 import type { AppData } from "../lib/types";
 
 export default function Profil() {
@@ -79,8 +80,8 @@ export default function Profil() {
               background: "var(--accent-soft)", display: "flex", alignItems: "center", justifyContent: "center",
             }}
           >
-            {profile.photoDataUrl ? (
-              <img src={profile.photoDataUrl} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+            {photoSrc(profile) ? (
+              <img src={photoSrc(profile)} alt="" style={{ width: "100%", height: "100%", objectFit: "cover" }} />
             ) : (
               <span style={{ color: "var(--accent-ink)" }}><Icon name="paw" size={44} /></span>
             )}
@@ -274,9 +275,18 @@ export default function Profil() {
         <ImageCropper
           src={cropSrc}
           onClose={() => setCropSrc(null)}
-          onDone={(url) => {
-            set("photoDataUrl", url);
+          onDone={async (url) => {
             setCropSrc(null);
+            const uploaded = await uploadDataUrl(url, "capitaine.jpg");
+            update((d) => {
+              if (uploaded) {
+                d.profile.photoUrl = uploaded.url;
+                d.profile.photoDataUrl = undefined;
+              } else {
+                d.profile.photoDataUrl = url;
+                d.profile.photoUrl = undefined;
+              }
+            });
           }}
         />
       )}

@@ -18,6 +18,7 @@ import {
   relativeToToday,
 } from "../lib/dates";
 import { euro } from "../lib/format";
+import { photoSrc } from "../lib/storage";
 
 const careIcon: Record<CareKind, "bug" | "pill" | "scissors"> = {
   antiparasite: "bug",
@@ -62,13 +63,13 @@ export default function Home() {
         <div
           style={{
             width: 62, height: 62, borderRadius: "50%",
-            background: profile.photoDataUrl ? undefined : "var(--accent-soft)",
+            background: photoSrc(profile) ? undefined : "var(--accent-soft)",
             display: "flex", alignItems: "center", justifyContent: "center",
             overflow: "hidden", flexShrink: 0,
           }}
         >
-          {profile.photoDataUrl ? (
-            <img src={profile.photoDataUrl} alt={profile.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          {photoSrc(profile) ? (
+            <img src={photoSrc(profile)} alt={profile.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
           ) : (
             <span style={{ color: "var(--accent-ink)" }}><Icon name="paw" size={30} /></span>
           )}

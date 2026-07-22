@@ -1,11 +1,11 @@
 import { Link } from "react-router-dom";
 import Sheet from "./Sheet";
 import Icon from "./Icon";
-import { useData, update, uid } from "../lib/store";
+import { useData, update } from "../lib/store";
 import { activeTreatments } from "../lib/selectors";
 import type { Appointment, Attachment, VetQuestion } from "../lib/types";
 import { formatDate, formatShort, relativeToToday } from "../lib/dates";
-import { fileToDataUrl } from "../lib/format";
+import { fileToAttachment, attachmentSrc } from "../lib/storage";
 
 function SectionTitle({ icon, label, to }: { icon: Parameters<typeof Icon>[0]["name"]; label: string; to?: string }) {
   return (
@@ -40,7 +40,7 @@ export default function AppointmentDetailSheet({
     if (!files) return;
     const added: Attachment[] = [];
     for (const f of Array.from(files)) {
-      added.push({ id: uid(), name: f.name, dataUrl: await fileToDataUrl(f), type: f.type });
+      added.push(await fileToAttachment(f));
     }
     update((d) => {
       const a = d.appointments.find((x) => x.id === appt.id);
@@ -76,8 +76,8 @@ export default function AppointmentDetailSheet({
           {appt.attachments.map((a) =>
             a.type.startsWith("image") ? (
               <div key={a.id} style={{ position: "relative" }}>
-                <a href={a.dataUrl} target="_blank" rel="noreferrer">
-                  <img src={a.dataUrl} alt={a.name} style={{ width: 76, height: 76, objectFit: "cover", borderRadius: 10, border: "0.5px solid var(--line)" }} />
+                <a href={attachmentSrc(a)} target="_blank" rel="noreferrer">
+                  <img src={attachmentSrc(a)} alt={a.name} style={{ width: 76, height: 76, objectFit: "cover", borderRadius: 10, border: "0.5px solid var(--line)" }} />
                 </a>
                 <button
                   onClick={() => removeAttachment(a.id)}

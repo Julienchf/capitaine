@@ -13,7 +13,8 @@ import { allCareStatuses, careInterval } from "../lib/selectors";
 import { CARE_META, ANTIPARASITE_FORMS } from "../lib/types";
 import type { CareKind, HealthEntry, Attachment, CareEvent, AntiparasiteForm, Treatment } from "../lib/types";
 import { formatDate, formatShort, relativeToToday, todayISO } from "../lib/dates";
-import { euro, fileToDataUrl } from "../lib/format";
+import { euro } from "../lib/format";
+import { fileToAttachment, attachmentSrc } from "../lib/storage";
 
 const careIcon: Record<CareKind, "bug" | "pill" | "scissors"> = {
   antiparasite: "bug",
@@ -510,8 +511,7 @@ function HealthSheet({ entry, onClose }: { entry: HealthEntry | null; onClose: (
     if (!files) return;
     const added: Attachment[] = [];
     for (const f of Array.from(files)) {
-      const dataUrl = await fileToDataUrl(f);
-      added.push({ id: uid(), name: f.name, dataUrl, type: f.type });
+      added.push(await fileToAttachment(f));
     }
     setAttachments((a) => [...a, ...added]);
   }
@@ -756,15 +756,15 @@ function HealthDetailSheet({
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
             {entry.attachments.map((a) =>
               a.type.startsWith("image") ? (
-                <a key={a.id} href={a.dataUrl} target="_blank" rel="noreferrer">
+                <a key={a.id} href={attachmentSrc(a)} target="_blank" rel="noreferrer">
                   <img
-                    src={a.dataUrl}
+                    src={attachmentSrc(a)}
                     alt={a.name}
                     style={{ width: 84, height: 84, objectFit: "cover", borderRadius: 10, border: "0.5px solid var(--line)" }}
                   />
                 </a>
               ) : (
-                <a key={a.id} href={a.dataUrl} download={a.name} className="chip">
+                <a key={a.id} href={attachmentSrc(a)} download={a.name} className="chip">
                   <Icon name="file" size={15} /> {a.name.length > 18 ? a.name.slice(0, 16) + "…" : a.name}
                 </a>
               ),
