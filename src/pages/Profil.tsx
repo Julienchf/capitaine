@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import Icon from "../components/Icon";
 import ImageCropper from "../components/ImageCropper";
 import BreedPicker from "../components/BreedPicker";
+import GuideEditor from "../components/GuideEditor";
 import Sheet from "../components/Sheet";
 import { useData, update, resetData, getData, mergeInData } from "../lib/store";
 import { ageText, humanAge, formatDate, todayISO } from "../lib/dates";
@@ -167,25 +168,17 @@ export default function Profil() {
       </div>
 
       <div className="section-title">Guide de garde</div>
-      <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 10, lineHeight: 1.5 }}>
+      <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 4, lineHeight: 1.5 }}>
         Le mode d'emploi pour la dogsitter — visible dans la fiche partagée.
       </div>
-      <div className="field" style={{ marginTop: 0 }}>
-        <label>Repas</label>
-        <textarea value={profile.feeding ?? ""} placeholder="Rythme, quantité, préparation…" onChange={(e) => set("feeding", e.target.value)} style={{ minHeight: 90 }} />
-      </div>
-      <div className="field">
-        <label>Sorties</label>
-        <textarea value={profile.outings ?? ""} placeholder="Horaires, comportement au parc…" onChange={(e) => set("outings", e.target.value)} style={{ minHeight: 110 }} />
-      </div>
-      <div className="field">
-        <label>Ce que Capitaine sait</label>
-        <textarea value={profile.commands ?? ""} placeholder="Ordres connus…" onChange={(e) => set("commands", e.target.value)} style={{ minHeight: 80 }} />
-      </div>
-      <div className="field">
-        <label>Règles à la maison</label>
-        <textarea value={profile.rules ?? ""} placeholder="Ce qui est autorisé ou non…" onChange={(e) => set("rules", e.target.value)} style={{ minHeight: 90 }} />
-      </div>
+      <GuideEditor
+        value={profile.guide ?? {}}
+        onChange={(patch) =>
+          update((d) => {
+            d.profile.guide = { ...(d.profile.guide ?? {}), ...patch };
+          })
+        }
+      />
 
       <div className="section-title">Bientôt disponible</div>
       <div className="row" style={{ marginBottom: 8, opacity: 0.7 }}>

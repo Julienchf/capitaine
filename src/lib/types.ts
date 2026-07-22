@@ -134,6 +134,66 @@ export const STOP_REASONS = [
   "Autre",
 ];
 
+/** Structured "mode d'emploi" for the dogsitter (replaces the old free-text guide). */
+export type TriState = "oui" | "non" | "depend";
+
+export interface DogGuide {
+  // Caractère
+  sociable?: TriState;
+  sociableNote?: string;
+  energy?: "bas" | "moyen" | "haut";
+  dominant?: TriState;
+  dominantNote?: string;
+  // Repas
+  mealsPerDay?: 1 | 2 | 3;
+  mealGrams?: number;
+  kibbleBrand?: string;
+  kibbleUrl?: string;
+  treats?: "oui" | "non" | "parfois";
+  treatsNote?: string;
+  mealsNote?: string;
+  // Sorties
+  housetrained?: "propre" | "presque" | "non";
+  outingMoments?: string[];
+  dogPark?: "oui" | "non";
+  dogParkNote?: string;
+  offLeash?: "oui" | "non";
+  offLeashNote?: string;
+  outingsNote?: string;
+  // Tours
+  tricks?: string[];
+  tricksNote?: string;
+  // Règles à la maison
+  sofa?: "oui" | "non" | "parfois";
+  bed?: "oui" | "non" | "parfois";
+  bath?: "oui" | "non" | "eviter";
+}
+
+/** Choix possibles des moments de sortie (multi-sélection). */
+export const OUTING_MOMENTS = [
+  "Au réveil",
+  "Après chaque repas",
+  "Milieu de journée",
+  "Fin d'après-midi",
+  "Avant de dormir",
+  "Toutes les 2–3 h",
+  "Quand il demande",
+];
+
+/** Libellés d'affichage des valeurs du guide. */
+export const GUIDE_LABELS: Record<string, string> = {
+  oui: "Oui",
+  non: "Non",
+  depend: "Ça dépend",
+  parfois: "Parfois",
+  eviter: "À éviter",
+  bas: "Basse",
+  moyen: "Moyenne",
+  haut: "Haute",
+  propre: "Propre",
+  presque: "Presque propre",
+};
+
 export interface Profile {
   name: string;
   breed: string;
@@ -152,6 +212,8 @@ export interface Profile {
   outings?: string;
   commands?: string;
   rules?: string;
+  /** Structured care guide (new). Falls back to the free-text fields above if absent. */
+  guide?: DogGuide;
   nextVetVisit?: string; // deprecated — migrated to appointments[]
 }
 

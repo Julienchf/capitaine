@@ -1,9 +1,13 @@
 import { useState } from "react";
 import Icon from "./Icon";
 import { activeTreatments, allCareStatuses } from "../lib/selectors";
-import { CARE_META } from "../lib/types";
-import type { AppData, HealthEntry, Treatment } from "../lib/types";
+import { CARE_META, GUIDE_LABELS } from "../lib/types";
+import type { AppData, DogGuide, HealthEntry, Treatment } from "../lib/types";
 import { ageText, formatDate, relativeToToday } from "../lib/dates";
+
+function guideHasContent(g?: DogGuide): boolean {
+  return !!g && Object.values(g).some((v) => (Array.isArray(v) ? v.length > 0 : v !== undefined && v !== ""));
+}
 
 type IconName = Parameters<typeof Icon>[0]["name"];
 const GUIDE_ICON: Record<string, IconName> = {
@@ -109,7 +113,12 @@ export default function SharedCard({ data }: { data: AppData }) {
         </>
       )}
 
-      {guideSections.length > 0 && (
+      {guideHasContent(profile.guide) ? (
+        <>
+          <div className="section-title"><Icon name="paw" size={15} /> Guide de garde</div>
+          <GuideView guide={profile.guide!} />
+        </>
+      ) : guideSections.length > 0 ? (
         <>
           <div className="section-title"><Icon name="paw" size={15} /> Guide de garde</div>
           <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
@@ -132,7 +141,7 @@ export default function SharedCard({ data }: { data: AppData }) {
             ))}
           </div>
         </>
-      )}
+      ) : null}
 
       {treatments.length > 0 && (
         <>
@@ -280,6 +289,115 @@ function GuideText({ text }: { text: string }) {
           <div key={i} style={{ fontSize: 14, lineHeight: 1.55, color: "var(--muted)" }}>{t}</div>
         );
       })}
+    </div>
+  );
+}
+
+const HOUSETRAINED: Record<string, string> = {
+  propre: "Propre", presque: "Presque propre", non: "Pas encore propre",
+};
+function lab(v?: string): string | undefined {
+  return v ? GUIDE_LABELS[v] ?? v : undefined;
+}
+
+function GPill({ children }: { children: React.ReactNode }) {
+  return (
+    <span style={{ fontSize: 12.5, fontWeight: 600, background: "var(--accent-soft)", color: "var(--accent-ink)", padding: "3px 11px", borderRadius: 999, whiteSpace: "nowrap" }}>
+      {children}
+    </span>
+  );
+}
+function GRow({ label, value, note }: { label: string; value?: React.ReactNode; note?: React.ReactNode }) {
+  if (value === undefined && !note) return null;
+  return (
+    <div style={{ padding: "10px 0", borderTop: "1px solid var(--line)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+        <span style={{ fontSize: 13.5, color: "var(--muted)" }}>{label}</span>
+        {value !== undefined && (typeof value === "string" ? <GPill>{value}</GPill> : value)}
+      </div>
+      {note && <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 6, lineHeight: 1.45 }}>{note}</div>}
+    </div>
+  );
+}
+function GChips({ label, items }: { label?: string; items: string[] }) {
+  if (!items.length) return null;
+  return (
+    <div style={{ padding: "10px 0", borderTop: "1px solid var(--line)" }}>
+      {label && <div style={{ fontSize: 13.5, color: "var(--muted)", marginBottom: 8 }}>{label}</div>}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+        {items.map((c, i) => (
+          <span key={i} style={{ fontSize: 13, background: "var(--accent-soft)", color: "var(--accent-ink)", padding: "5px 11px", borderRadius: 999, fontWeight: 500 }}>{c}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+function GuideCard({ icon, title, children }: { icon: IconName; title: string; children: React.ReactNode }) {
+  return (
+    <div className="card card-pad">
+      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 2 }}>
+        <span style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: "var(--accent-soft)", color: "var(--accent-ink)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+          <Icon name={icon} size={18} />
+        </span>
+        <span style={{ fontSize: 15.5, fontWeight: 600 }}>{title}</span>
+      </div>
+      {children}
+    </div>
+  );
+}
+
+function GuideView({ guide: g }: { guide: DogGuide }) {
+  const moments = g.outingMoments ?? [];
+  const tricks = g.tricks ?? [];
+  const hasCarac = g.sociable || g.energy || g.dominant || g.sociableNote || g.dominantNote;
+  const hasRepas = g.mealsPerDay || g.mealGrams != null || g.kibbleBrand || g.kibbleUrl || g.treats || g.treatsNote || g.mealsNote;
+  const hasSorties = g.housetrained || moments.length || g.dogPark || g.offLeash || g.dogParkNote || g.offLeashNote || g.outingsNote;
+  const hasTricks = tricks.length || g.tricksNote;
+  const hasRules = g.sofa || g.bed || g.bath;
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+      {hasCarac && (
+        <GuideCard icon="paw" title="Caractère">
+          <GRow label="Sociable" value={lab(g.sociable)} note={g.sociableNote} />
+          <GRow label="Niveau d'énergie" value={lab(g.energy)} />
+          <GRow label="Dominant·e" value={lab(g.dominant)} note={g.dominantNote} />
+        </GuideCard>
+      )}
+      {hasRepas && (
+        <GuideCard icon="bowl" title="Repas">
+          <GRow label="Rythme" value={g.mealsPerDay ? `${g.mealsPerDay}×/jour` : undefined} />
+          <GRow label="Quantité" value={g.mealGrams != null ? `${g.mealGrams} g / repas` : undefined} />
+          <GRow
+            label="Croquettes"
+            value={g.kibbleBrand}
+            note={g.kibbleUrl ? <a href={g.kibbleUrl} target="_blank" rel="noreferrer" style={{ color: "var(--accent-ink)", fontWeight: 500 }}>Voir le produit →</a> : undefined}
+          />
+          <GRow label="Friandises" value={lab(g.treats)} note={g.treatsNote} />
+          {g.mealsNote && <GRow label="Remarque" note={g.mealsNote} />}
+        </GuideCard>
+      )}
+      {hasSorties && (
+        <GuideCard icon="paw" title="Sorties">
+          <GRow label="Propreté" value={g.housetrained ? HOUSETRAINED[g.housetrained] : undefined} />
+          <GChips label="Rythme des sorties" items={moments} />
+          <GRow label="Parc à chiens" value={lab(g.dogPark)} note={g.dogParkNote} />
+          <GRow label="Sans laisse" value={lab(g.offLeash)} note={g.offLeashNote} />
+          {g.outingsNote && <GRow label="Remarque" note={g.outingsNote} />}
+        </GuideCard>
+      )}
+      {hasTricks && (
+        <GuideCard icon="check" title="Ce que Capitaine sait">
+          <GChips items={tricks} />
+          {g.tricksNote && <GRow label="Remarque" note={g.tricksNote} />}
+        </GuideCard>
+      )}
+      {hasRules && (
+        <GuideCard icon="home" title="Règles à la maison">
+          <GRow label="Canapé" value={lab(g.sofa)} />
+          <GRow label="Lit" value={lab(g.bed)} />
+          <GRow label="Bain / douche" value={lab(g.bath)} />
+        </GuideCard>
+      )}
     </div>
   );
 }
