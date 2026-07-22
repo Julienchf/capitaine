@@ -77,7 +77,7 @@ export default async function handler(req) {
   // Call Gemini, retrying a few times on transient overload (429/503).
   let gRes;
   let lastDetail = "";
-  for (let attempt = 0; attempt < 4; attempt++) {
+  for (let attempt = 0; attempt < 3; attempt++) {
     try {
       gRes = await fetch(ENDPOINT(key), {
         method: "POST",
@@ -88,9 +88,11 @@ export default async function handler(req) {
       return json({ ok: false, error: "Impossible de joindre Gemini : " + (e?.message || e) }, 502);
     }
     if (gRes.ok) break;
-    lastDetail = (await gRes.text().catch(() => "")).slice(0, 500);
-    if (gRes.status === 429 || gRes.status === 503) {
-      await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+    lastDetail = (await gRes.text().catch(() => "")).slice(0, 800);
+    // 503 = surcharge passagère → on réessaie. 429 = quota atteint → réessayer
+    // n'aide pas (ça consomme encore le quota), on s'arrête et on informe.
+    if (gRes.status === 503) {
+      await new Promise((r) => setTimeout(r, 700 * (attempt + 1)));
       continue;
     }
     break;
@@ -98,10 +100,15 @@ export default async function handler(req) {
 
   if (!gRes || !gRes.ok) {
     const status = gRes?.status ?? 0;
-    const msg =
-      status === 429 || status === 503
-        ? "Le service d'analyse est momentanément surchargé, réessaie dans un instant."
-        : `L'analyse a échoué (code ${status}).`;
+    let msg;
+    if (status === 429) {
+      const secs = retrySeconds(lastDetail);
+      msg = `Trop de scans d'affilée : la limite gratuite de l'IA est atteinte. Réessaie ${secs ? `dans ~${secs} s` : "dans une minute"}.`;
+    } else if (status === 503) {
+      msg = "Le service d'analyse est momentanément surchargé, réessaie dans un instant.";
+    } else {
+      msg = `L'analyse a échoué (code ${status}).`;
+    }
     return json({ ok: false, error: msg, detail: lastDetail }, 502);
   }
 
@@ -119,6 +126,12 @@ export default async function handler(req) {
   }
 
   return json({ ok: true, fields });
+}
+
+// Extrait le délai de réessai conseillé par Gemini ("retryDelay":"25s" ou "retry in 25.8s").
+function retrySeconds(detail) {
+  const m = detail.match(/retryDelay["':\s]+(\d+(?:\.\d+)?)s/i) || detail.match(/retry in (\d+(?:\.\d+)?)\s*s/i);
+  return m ? Math.ceil(Number(m[1])) : null;
 }
 
 function json(obj, status = 200) {
