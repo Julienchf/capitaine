@@ -389,7 +389,7 @@ function GuideView({ guide: g }: { guide: DogGuide }) {
         </GuideAccordion>
       )}
       {hasTricks && (
-        <GuideAccordion icon="check" title="Ce que Capitaine sait">
+        <GuideAccordion icon="check" title="Les tours">
           <GChips items={tricks} />
           {g.tricksNote && <GRow label="Remarque" note={g.tricksNote} />}
         </GuideAccordion>
