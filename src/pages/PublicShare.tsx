@@ -43,8 +43,17 @@ export default function PublicShare() {
   return (
     <div className="page" style={{ paddingBottom: 40 }}>
       <div className="page-header" style={{ paddingLeft: 0, paddingRight: 0 }}>
-        <h1>{data.profile?.name || "Capitaine"}</h1>
-        <div className="sub">Fiche partagée · lecture seule</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+          <img
+            src="/pwa-192.png"
+            alt="Capitaine"
+            width={38}
+            height={38}
+            style={{ borderRadius: 11, border: "1px solid var(--glass-brd)", boxShadow: "var(--shadow)" }}
+          />
+          <h1>Capitaine</h1>
+        </div>
+        <div className="sub" style={{ marginTop: 6 }}>Fiche partagée · lecture seule</div>
       </div>
       <SharedCard data={data} />
       <div style={{ fontSize: 12.5, color: "var(--faint)", textAlign: "center", marginTop: 16, padding: "0 20px" }}>

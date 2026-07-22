@@ -332,17 +332,20 @@ function GChips({ label, items }: { label?: string; items: string[] }) {
     </div>
   );
 }
-function GuideCard({ icon, title, children }: { icon: IconName; title: string; children: React.ReactNode }) {
+function GuideAccordion({ icon, title, children }: { icon: IconName; title: string; children: React.ReactNode }) {
   return (
-    <div className="card card-pad">
-      <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 2 }}>
-        <span style={{ width: 32, height: 32, borderRadius: 9, flexShrink: 0, background: "var(--accent-soft)", color: "var(--accent-ink)", display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <Icon name={icon} size={18} />
+    <details className="acc">
+      <summary>
+        <span style={{ display: "flex", alignItems: "center", gap: 11 }}>
+          <span style={{ width: 30, height: 30, borderRadius: 9, flexShrink: 0, background: "var(--accent-soft)", color: "var(--accent-ink)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+            <Icon name={icon} size={17} />
+          </span>
+          <span style={{ fontSize: 15, fontWeight: 600, color: "var(--text)" }}>{title}</span>
         </span>
-        <span style={{ fontSize: 15.5, fontWeight: 600 }}>{title}</span>
-      </div>
-      {children}
-    </div>
+        <span className="chev"><Icon name="chevron" size={16} /></span>
+      </summary>
+      <div className="acc-body" style={{ paddingTop: 0 }}>{children}</div>
+    </details>
   );
 }
 
@@ -355,16 +358,16 @@ function GuideView({ guide: g }: { guide: DogGuide }) {
   const hasTricks = tricks.length || g.tricksNote;
   const hasRules = g.sofa || g.bed || g.bath;
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+    <div className="card" style={{ padding: "2px 15px" }}>
       {hasCarac && (
-        <GuideCard icon="paw" title="Caractère">
+        <GuideAccordion icon="paw" title="Caractère">
           <GRow label="Sociable" value={lab(g.sociable)} note={g.sociableNote} />
           <GRow label="Niveau d'énergie" value={lab(g.energy)} />
           <GRow label="Dominant·e" value={lab(g.dominant)} note={g.dominantNote} />
-        </GuideCard>
+        </GuideAccordion>
       )}
       {hasRepas && (
-        <GuideCard icon="bowl" title="Repas">
+        <GuideAccordion icon="bowl" title="Repas">
           <GRow label="Rythme" value={g.mealsPerDay ? `${g.mealsPerDay}×/jour` : undefined} />
           <GRow label="Quantité" value={g.mealGrams != null ? `${g.mealGrams} g / repas` : undefined} />
           <GRow
@@ -374,29 +377,29 @@ function GuideView({ guide: g }: { guide: DogGuide }) {
           />
           <GRow label="Friandises" value={lab(g.treats)} note={g.treatsNote} />
           {g.mealsNote && <GRow label="Remarque" note={g.mealsNote} />}
-        </GuideCard>
+        </GuideAccordion>
       )}
       {hasSorties && (
-        <GuideCard icon="paw" title="Sorties">
+        <GuideAccordion icon="paw" title="Sorties">
           <GRow label="Propreté" value={g.housetrained ? HOUSETRAINED[g.housetrained] : undefined} />
           <GChips label="Rythme des sorties" items={moments} />
           <GRow label="Parc à chiens" value={lab(g.dogPark)} note={g.dogParkNote} />
           <GRow label="Sans laisse" value={lab(g.offLeash)} note={g.offLeashNote} />
           {g.outingsNote && <GRow label="Remarque" note={g.outingsNote} />}
-        </GuideCard>
+        </GuideAccordion>
       )}
       {hasTricks && (
-        <GuideCard icon="check" title="Ce que Capitaine sait">
+        <GuideAccordion icon="check" title="Ce que Capitaine sait">
           <GChips items={tricks} />
           {g.tricksNote && <GRow label="Remarque" note={g.tricksNote} />}
-        </GuideCard>
+        </GuideAccordion>
       )}
       {hasRules && (
-        <GuideCard icon="home" title="Règles à la maison">
+        <GuideAccordion icon="home" title="Règles à la maison">
           <GRow label="Canapé" value={lab(g.sofa)} />
           <GRow label="Lit" value={lab(g.bed)} />
           <GRow label="Bain / douche" value={lab(g.bath)} />
-        </GuideCard>
+        </GuideAccordion>
       )}
     </div>
   );
