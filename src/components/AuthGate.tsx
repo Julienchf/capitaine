@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import type { Session } from "@supabase/supabase-js";
 import { supabase, isSyncConfigured } from "../lib/supabase";
 import { startSync } from "../lib/sync";
-import Icon from "./Icon";
 
 export default function AuthGate({ children }: { children: React.ReactNode }) {
   // Local-only mode: no project connected yet — run the app as-is.
@@ -85,15 +84,17 @@ function Login() {
 
   return (
     <div className="page" style={{ maxWidth: 360, margin: "0 auto", paddingTop: 56, textAlign: "center" }}>
-      <div
+      <img
+        src="/pwa-512.png"
+        alt="Capitaine"
+        width={88}
+        height={88}
         style={{
-          width: 72, height: 72, borderRadius: 20, background: "var(--accent)", color: "#fff",
-          display: "inline-flex", alignItems: "center", justifyContent: "center", marginBottom: 18,
+          borderRadius: 24, marginBottom: 18,
+          boxShadow: "var(--shadow)", border: "1px solid var(--glass-brd)",
         }}
-      >
-        <Icon name="paw" size={40} />
-      </div>
-      <h1 style={{ fontSize: 26 }}>Capitaine</h1>
+      />
+      <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.03em" }}>Capitaine</h1>
       <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 6, marginBottom: 24 }}>
         {mode === "signin" ? "Connecte-toi pour retrouver Capitaine." : "Crée ton compte (une seule fois)."}
       </p>
