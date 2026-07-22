@@ -37,7 +37,7 @@ export async function extractFacture(files: File[]): Promise<ExtractedFacture> {
 
   let res: Response;
   try {
-    res = await fetch("/.netlify/functions/extract-facture", {
+    res = await fetch("/api/extract-facture", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ files: docs }),
