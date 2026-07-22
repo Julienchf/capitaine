@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useSearchParams, Link } from "react-router-dom";
 import Icon from "../components/Icon";
 import Sheet from "../components/Sheet";
 import TreatmentSheet from "../components/TreatmentSheet";
@@ -11,7 +11,7 @@ import { AttachmentChips, AttachmentView } from "../components/Attachments";
 import { useData, update, uid } from "../lib/store";
 import { allCareStatuses, careInterval } from "../lib/selectors";
 import { CARE_META, ANTIPARASITE_FORMS } from "../lib/types";
-import type { CareKind, HealthEntry, Attachment, CareEvent, AntiparasiteForm, Treatment } from "../lib/types";
+import type { CareKind, HealthEntry, Attachment, CareEvent, AntiparasiteForm, Treatment, Expense } from "../lib/types";
 import { formatDate, formatShort, relativeToToday, todayISO } from "../lib/dates";
 import { euro } from "../lib/format";
 import { fileToAttachment, attachmentSrc } from "../lib/storage";
@@ -43,6 +43,11 @@ function CostChip({ value }: { value: number }) {
 
 type Tab = "soins" | "carnet" | "traitements" | "rdv";
 
+/** Une ligne du carnet : un pépin de santé, ou une dépense vétérinaire (affichée, pas dupliquée). */
+type CarnetItem =
+  | { kind: "pepin"; id: string; date: string; title: string; cost?: number; attachments: Attachment[]; entry: HealthEntry }
+  | { kind: "expense"; id: string; date: string; title: string; cost?: number; attachments: Attachment[]; expense: Expense };
+
 export default function Sante() {
   const data = useData();
   const [sp, setSp] = useSearchParams();
@@ -54,6 +59,7 @@ export default function Sante() {
   const [configKind, setConfigKind] = useState<CareKind | null>(null);
   const [editEntry, setEditEntry] = useState<HealthEntry | "new" | null>(null);
   const [detailEntry, setDetailEntry] = useState<HealthEntry | null>(null);
+  const [detailExpense, setDetailExpense] = useState<Expense | null>(null);
   const [search, setSearch] = useState("");
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [dateFrom, setDateFrom] = useState("");
@@ -66,18 +72,28 @@ export default function Sante() {
   const q = search.trim().toLowerCase();
   const minA = amountMin ? parseFloat(amountMin) : null;
   const maxA = amountMax ? parseFloat(amountMax) : null;
-  const health = [...data.health]
-    .sort((a, b) => b.date.localeCompare(a.date))
-    .filter((h) => {
-      if (q && ![h.title, h.description, h.medications, formatDate(h.date)].filter(Boolean).some((f) => f!.toLowerCase().includes(q))) return false;
-      if (dateFrom && h.date < dateFrom) return false;
-      if (dateTo && h.date > dateTo) return false;
-      if (minA != null && (h.cost ?? 0) < minA) return false;
-      if (maxA != null && (h.cost ?? 0) > maxA) return false;
-      return true;
-    });
+  // Le carnet = pépins de santé + dépenses vétérinaires (affichées, pas dupliquées).
+  const carnetAll: CarnetItem[] = [
+    ...data.health.map((h): CarnetItem => ({ kind: "pepin", id: h.id, date: h.date, title: h.title, cost: h.cost, attachments: h.attachments, entry: h })),
+    ...data.expenses
+      .filter((e) => e.category === "veto")
+      .map((e): CarnetItem => ({ kind: "expense", id: e.id, date: e.date, title: e.label || "Dépense vétérinaire", cost: e.amount, attachments: e.attachments ?? [], expense: e })),
+  ].sort((a, b) => b.date.localeCompare(a.date));
+
+  const carnet = carnetAll.filter((it) => {
+    const hay = [it.title, formatDate(it.date), it.kind === "pepin" ? it.entry.description : "", it.kind === "pepin" ? it.entry.medications : ""]
+      .filter(Boolean)
+      .map((s) => s!.toLowerCase());
+    if (q && !hay.some((f) => f.includes(q))) return false;
+    if (dateFrom && it.date < dateFrom) return false;
+    if (dateTo && it.date > dateTo) return false;
+    const c = it.cost ?? 0;
+    if (minA != null && c < minA) return false;
+    if (maxA != null && c > maxA) return false;
+    return true;
+  });
   const anyHealthFilter = !!(q || dateFrom || dateTo || amountMin || amountMax);
-  const shownHealth = anyHealthFilter || showAllHealth ? health : health.slice(0, 5);
+  const shownCarnet = anyHealthFilter || showAllHealth ? carnet : carnet.slice(0, 5);
 
   return (
     <div className="page">
@@ -174,7 +190,7 @@ export default function Sante() {
 
       {tab === "carnet" && (
         <>
-          {data.health.length > 0 && (
+          {carnetAll.length > 0 && (
             <>
               <div style={{ display: "flex", gap: 8, marginBottom: 10 }}>
                 <div style={{ position: "relative", flex: 1 }}>
@@ -237,49 +253,54 @@ export default function Sante() {
             <Icon name="plus" size={18} /> Ajouter au carnet
           </button>
 
-          {data.health.length === 0 ? (
+          {carnetAll.length === 0 ? (
             <div className="empty">
               <Icon name="health" size={34} className="ic" />
               Aucun pépin de santé enregistré.
               <br />
               Ajoutez une consultation, un traitement, une ordonnance.
             </div>
-          ) : health.length === 0 ? (
+          ) : carnet.length === 0 ? (
             <div className="empty">Aucun résultat pour ces filtres.</div>
           ) : (
             <>
               <div className="grid-2">
-                {shownHealth.map((h) => (
+                {shownCarnet.map((it) => (
                   <EventCard
-                    key={h.id}
-                    title={h.title}
-                    dateLabel={formatDate(h.date)}
+                    key={it.kind + it.id}
+                    title={it.title}
+                    dateLabel={formatDate(it.date)}
                     extra={
                       <>
-                        {h.cost != null && <CostChip value={h.cost} />}
-                        {h.attachments.length > 0 && (
+                        {it.cost != null && <CostChip value={it.cost} />}
+                        {it.kind === "expense" && (
+                          <span style={{ fontSize: 11, color: "var(--muted)", background: "var(--surface-2)", padding: "2px 7px", borderRadius: 999, display: "flex", alignItems: "center", gap: 3 }}>
+                            <Icon name="wallet" size={12} /> Facture
+                          </span>
+                        )}
+                        {it.attachments.length > 0 && (
                           <span
                             style={{
                               fontSize: 11, color: "var(--accent-ink)", background: "var(--accent-soft)",
                               padding: "2px 7px", borderRadius: 999, display: "flex", alignItems: "center", gap: 3,
                             }}
                           >
-                            <Icon name="file" size={12} /> {h.attachments.length}
+                            <Icon name="file" size={12} /> {it.attachments.length}
                           </span>
                         )}
                       </>
                     }
-                    onClick={() => setDetailEntry(h)}
+                    onClick={() => (it.kind === "pepin" ? setDetailEntry(it.entry) : setDetailExpense(it.expense))}
                   />
                 ))}
               </div>
-              {!anyHealthFilter && health.length > 5 && (
+              {!anyHealthFilter && carnet.length > 5 && (
                 <button
                   className="btn ghost block"
                   style={{ marginTop: 10, color: "var(--accent-ink)" }}
                   onClick={() => setShowAllHealth((v) => !v)}
                 >
-                  {showAllHealth ? "Réduire" : `Voir les ${health.length - 5} autres`}
+                  {showAllHealth ? "Réduire" : `Voir les ${carnet.length - 5} autres`}
                 </button>
               )}
             </>
@@ -317,7 +338,29 @@ export default function Sante() {
       {editEntry && (
         <HealthSheet entry={editEntry === "new" ? null : editEntry} onClose={() => setEditEntry(null)} />
       )}
+      {detailExpense && (
+        <VetExpenseDetailSheet expense={detailExpense} onClose={() => setDetailExpense(null)} />
+      )}
     </div>
+  );
+}
+
+function VetExpenseDetailSheet({ expense, onClose }: { expense: Expense; onClose: () => void }) {
+  return (
+    <Sheet title={expense.label || "Dépense vétérinaire"} onClose={onClose}>
+      <div style={{ marginTop: 6 }}>
+        <DetailRow label="Date" value={formatDate(expense.date)} />
+        <DetailRow label="Montant" value={euro(expense.amount)} />
+        <DetailRow label="Type" value="Dépense vétérinaire" />
+      </div>
+      <AttachmentView items={expense.attachments} label="Facture" />
+      <div style={{ fontSize: 12.5, color: "var(--muted)", marginTop: 14, lineHeight: 1.5 }}>
+        Cette dépense vient de l'onglet <b>Budget</b> — c'est là qu'on la modifie ou la supprime.
+      </div>
+      <Link to="/budget" className="btn block" style={{ marginTop: 12 }} onClick={onClose}>
+        <Icon name="wallet" size={17} /> Ouvrir dans Budget
+      </Link>
+    </Sheet>
   );
 }
 
