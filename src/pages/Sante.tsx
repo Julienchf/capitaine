@@ -573,6 +573,12 @@ function HealthSheet({ entry, onClose }: { entry: HealthEntry | null; onClose: (
             if (desc && !description.trim()) setDescription(desc);
           }}
         />
+        <label className="btn block" style={{ cursor: "pointer", marginBottom: 4, display: "flex", alignItems: "center", justifyContent: "center", gap: 8 }}>
+          <Icon name="camera" size={18} /> Ajouter une ordonnance ou un document
+          <input type="file" accept="image/*,application/pdf" multiple hidden onChange={(e) => { void onFiles(e.target.files); e.target.value = ""; }} />
+        </label>
+        <AttachmentChips items={attachments} onRemove={(id) => setAttachments((x) => x.filter((y) => y.id !== id))} />
+
         <div className="field">
           <label>Intitulé</label>
           <input placeholder="ex. Boiterie patte avant" value={title} onChange={(e) => setTitle(e.target.value)} />
@@ -619,21 +625,6 @@ function HealthSheet({ entry, onClose }: { entry: HealthEntry | null; onClose: (
         <div className="field">
           <label>Coût (optionnel)</label>
           <input type="number" inputMode="decimal" placeholder="ex. 48" value={cost} onChange={(e) => setCost(e.target.value)} />
-        </div>
-
-        <div className="field">
-          <label>Ordonnances / factures</label>
-          <div className="chips" style={{ marginBottom: attachments.length ? 10 : 0 }}>
-            {attachments.map((a) => (
-              <span key={a.id} className="chip on" onClick={() => setAttachments((x) => x.filter((y) => y.id !== a.id))}>
-                <Icon name="file" size={15} /> {a.name.length > 16 ? a.name.slice(0, 14) + "…" : a.name} ✕
-              </span>
-            ))}
-          </div>
-          <label className="btn block" style={{ cursor: "pointer" }}>
-            <Icon name="camera" size={18} /> Photo ou fichier
-            <input type="file" accept="image/*,application/pdf" multiple hidden onChange={(e) => onFiles(e.target.files)} />
-          </label>
         </div>
 
         <button className="btn primary block" style={{ marginTop: 20 }} onClick={save}>

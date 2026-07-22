@@ -29,7 +29,7 @@ const RESPONSE_SCHEMA = {
   required: ["amount", "date", "category", "label"],
 };
 
-const PROMPT = `Tu analyses une facture (ou un ticket / une photo de facture) liée à un chien, en français.
+const PROMPT = `Tu analyses un ou plusieurs documents (facture, ticket, ordonnance, photo) concernant UNE MÊME dépense ou UN MÊME événement lié à un chien, en français. S'il y a plusieurs pages/documents, combine-les en un seul résultat.
 Extrais les informations demandées et renvoie-les au format JSON demandé.
 Règles :
 - « amount » = le TOTAL réellement payé, TTC, en euros (nombre décimal, sans symbole).
@@ -54,20 +54,20 @@ export default async (req) => {
   } catch {
     return json({ ok: false, error: "Corps de requête invalide." }, 400);
   }
-  const { fileBase64, mimeType } = body || {};
-  if (!fileBase64 || !mimeType) {
+  // Accept either a list of documents (new) or a single file (back-compat).
+  let docs = [];
+  if (Array.isArray(body?.files) && body.files.length) docs = body.files;
+  else if (body?.fileBase64 && body?.mimeType) docs = [{ fileBase64: body.fileBase64, mimeType: body.mimeType }];
+  docs = docs.filter((d) => d && d.fileBase64 && d.mimeType);
+  if (!docs.length) {
     return json({ ok: false, error: "Fichier manquant." }, 400);
   }
 
+  const parts = docs.map((d) => ({ inline_data: { mime_type: d.mimeType, data: d.fileBase64 } }));
+  parts.push({ text: PROMPT });
+
   const payload = {
-    contents: [
-      {
-        parts: [
-          { inline_data: { mime_type: mimeType, data: fileBase64 } },
-          { text: PROMPT },
-        ],
-      },
-    ],
+    contents: [{ parts }],
     generationConfig: {
       responseMimeType: "application/json",
       responseSchema: RESPONSE_SCHEMA,
@@ -75,20 +75,35 @@ export default async (req) => {
     },
   };
 
+  // Call Gemini, retrying a few times on transient overload (429/503).
   let gRes;
-  try {
-    gRes = await fetch(ENDPOINT(key), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-  } catch (e) {
-    return json({ ok: false, error: "Impossible de joindre Gemini : " + (e?.message || e) }, 502);
+  let lastDetail = "";
+  for (let attempt = 0; attempt < 4; attempt++) {
+    try {
+      gRes = await fetch(ENDPOINT(key), {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+    } catch (e) {
+      return json({ ok: false, error: "Impossible de joindre Gemini : " + (e?.message || e) }, 502);
+    }
+    if (gRes.ok) break;
+    lastDetail = (await gRes.text().catch(() => "")).slice(0, 500);
+    if (gRes.status === 429 || gRes.status === 503) {
+      await new Promise((r) => setTimeout(r, 800 * (attempt + 1)));
+      continue; // transient — retry
+    }
+    break; // non-transient error — stop
   }
 
-  if (!gRes.ok) {
-    const detail = await gRes.text().catch(() => "");
-    return json({ ok: false, error: `Gemini a renvoyé ${gRes.status}`, detail: detail.slice(0, 500) }, 502);
+  if (!gRes || !gRes.ok) {
+    const status = gRes?.status ?? 0;
+    const msg =
+      status === 429 || status === 503
+        ? "Le service d'analyse est momentanément surchargé, réessaie dans un instant."
+        : `L'analyse a échoué (code ${status}).`;
+    return json({ ok: false, error: msg, detail: lastDetail }, 502);
   }
 
   const data = await gRes.json();

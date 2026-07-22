@@ -17,23 +17,30 @@ export interface ExtractedFacture {
 const MAX_BYTES = 15 * 1024 * 1024;
 
 /**
- * Send a PDF or image invoice to the serverless extractor and get back the
- * pre-fill fields. Throws with a user-facing French message on failure.
+ * Send one or several PDF/image documents of the SAME expense/event to the
+ * serverless extractor and get back the combined pre-fill fields. Throws with a
+ * user-facing French message on failure.
  */
-export async function extractFacture(file: File): Promise<ExtractedFacture> {
-  if (file.size > MAX_BYTES) {
-    throw new Error("Fichier trop lourd (max 15 Mo).");
+export async function extractFacture(files: File[]): Promise<ExtractedFacture> {
+  const docs: { fileBase64: string; mimeType: string }[] = [];
+  for (const file of files) {
+    if (file.size > MAX_BYTES) {
+      throw new Error(`« ${file.name} » est trop lourd (max 15 Mo).`);
+    }
+    const dataUrl = await fileToDataUrl(file);
+    docs.push({
+      fileBase64: dataUrl.split(",")[1] ?? "",
+      mimeType: file.type || (dataUrl.match(/^data:(.*?);/)?.[1] ?? "application/octet-stream"),
+    });
   }
-  const dataUrl = await fileToDataUrl(file);
-  const base64 = dataUrl.split(",")[1] ?? "";
-  const mimeType = file.type || (dataUrl.match(/^data:(.*?);/)?.[1] ?? "application/octet-stream");
+  if (!docs.length) throw new Error("Aucun fichier à analyser.");
 
   let res: Response;
   try {
     res = await fetch("/.netlify/functions/extract-facture", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ fileBase64: base64, mimeType }),
+      body: JSON.stringify({ files: docs }),
     });
   } catch {
     throw new Error("Analyse indisponible (pas de connexion au serveur).");

@@ -24,18 +24,22 @@ export default function FactureLoader({
   const [note, setNote] = useState<string | null>(null);
 
   async function handle(files: FileList | null) {
-    const file = files?.[0];
-    if (!file) return;
-    const dataUrl = await fileToDataUrl(file);
-    onAttachment({ id: uid(), name: file.name, dataUrl, type: file.type });
+    const list = files ? Array.from(files) : [];
+    if (!list.length) return;
+    // Keep every file as an attachment, whatever the extraction does.
+    for (const file of list) {
+      const dataUrl = await fileToDataUrl(file);
+      onAttachment({ id: uid(), name: file.name, dataUrl, type: file.type });
+    }
     setAnalyzing(true);
     setNote(null);
     try {
-      const f = await extractFacture(file);
+      const f = await extractFacture(list);
       onFields(f);
-      setNote("Champs pré-remplis depuis la facture — vérifie puis enregistre. ✅");
+      const n = list.length > 1 ? `${list.length} documents analysés` : "Facture analysée";
+      setNote(`${n} — champs pré-remplis, vérifie puis enregistre. ✅`);
     } catch (e) {
-      setNote((e as Error).message + " La facture reste jointe, saisis les champs à la main.");
+      setNote((e as Error).message + " Les fichiers restent joints, saisis les champs à la main.");
     } finally {
       setAnalyzing(false);
     }
@@ -59,6 +63,7 @@ export default function FactureLoader({
         <input
           type="file"
           accept="image/*,application/pdf"
+          multiple
           hidden
           disabled={analyzing}
           onChange={(e) => {

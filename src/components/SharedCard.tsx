@@ -5,6 +5,14 @@ import { CARE_META } from "../lib/types";
 import type { AppData, HealthEntry, Treatment } from "../lib/types";
 import { ageText, formatDate, relativeToToday } from "../lib/dates";
 
+type IconName = Parameters<typeof Icon>[0]["name"];
+const GUIDE_ICON: Record<string, IconName> = {
+  "Repas": "bowl",
+  "Sorties": "paw",
+  "Ce que Capitaine sait": "check",
+  "Règles à la maison": "home",
+};
+
 export default function SharedCard({ data }: { data: AppData }) {
   const { profile } = data;
   const health = [...data.health].sort((a, b) => b.date.localeCompare(a.date));
@@ -104,17 +112,23 @@ export default function SharedCard({ data }: { data: AppData }) {
       {guideSections.length > 0 && (
         <>
           <div className="section-title"><Icon name="paw" size={15} /> Guide de garde</div>
-          <div className="card" style={{ padding: "0 15px" }}>
+          <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
             {guideSections.map((s) => (
-              <details className="acc" key={s.title}>
-                <summary>
-                  <span style={{ fontWeight: 500 }}>{s.title}</span>
-                  <span className="chev"><Icon name="chevron" size={16} /></span>
-                </summary>
-                <div className="acc-body" style={{ color: "var(--text)" }}>
-                  <GuideText text={s.content!} />
+              <div className="card card-pad" key={s.title}>
+                <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
+                  <span
+                    style={{
+                      width: 32, height: 32, borderRadius: 9, flexShrink: 0,
+                      background: "var(--accent-soft)", color: "var(--accent-ink)",
+                      display: "flex", alignItems: "center", justifyContent: "center",
+                    }}
+                  >
+                    <Icon name={GUIDE_ICON[s.title] ?? "paw"} size={18} />
+                  </span>
+                  <span style={{ fontSize: 15.5, fontWeight: 600 }}>{s.title}</span>
                 </div>
-              </details>
+                <GuideText text={s.content!} />
+              </div>
             ))}
           </div>
         </>
@@ -178,40 +192,57 @@ function InfoLine({ icon, children }: { icon: Parameters<typeof Icon>[0]["name"]
   );
 }
 
-/** Renders a guide section's plain text as a clean list (bullets, numbers, paragraphs). */
+/** A line of guide text, possibly "Label : détails" → bold the label for scannability. */
+function LabeledText({ text, size = 14 }: { text: string; size?: number }) {
+  const m = text.match(/^([^:]{1,28}):\s*(.+)$/);
+  if (m) {
+    return (
+      <span style={{ fontSize: size, lineHeight: 1.45, color: "var(--text)" }}>
+        <b style={{ fontWeight: 600 }}>{m[1].trim()}</b> — {m[2].trim()}
+      </span>
+    );
+  }
+  return <span style={{ fontSize: size, lineHeight: 1.45, color: "var(--text)" }}>{text}</span>;
+}
+
+/**
+ * Renders a guide section's free text as one harmonised layout, whatever the
+ * raw formatting: intro paragraphs, bullet lists, numbered steps, and
+ * "· "-separated inline lists all get a consistent, scannable style.
+ */
 function GuideText({ text }: { text: string }) {
-  const lines = text.split("\n");
+  const lines = text.split("\n").map((l) => l.trim()).filter(Boolean);
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-      {lines.map((raw, i) => {
-        const t = raw.trim();
-        if (!t) return null;
+    <div style={{ display: "flex", flexDirection: "column", gap: 9 }}>
+      {lines.map((t, i) => {
+        // Numbered step → numbered badge.
         const num = t.match(/^(\d+)[.)]\s*(.*)$/);
         if (num) {
           return (
             <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
               <span
                 style={{
-                  flexShrink: 0, width: 20, height: 20, borderRadius: "50%",
-                  background: "var(--accent-soft)", color: "var(--accent-ink)",
-                  fontSize: 11.5, fontWeight: 600, display: "flex", alignItems: "center", justifyContent: "center",
+                  flexShrink: 0, width: 22, height: 22, borderRadius: "50%",
+                  background: "var(--accent)", color: "#fff",
+                  fontSize: 12, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center",
                 }}
               >
                 {num[1]}
               </span>
-              <span style={{ fontSize: 14, lineHeight: 1.45, color: "var(--text)" }}>{num[2]}</span>
+              <LabeledText text={num[2]} />
             </div>
           );
         }
-        if (t.startsWith("•") || t.startsWith("-")) {
+        // Bullet line → coloured dot + labelled text.
+        if (t.startsWith("•") || t.startsWith("-") || t.startsWith("*")) {
           return (
-            <div key={i} style={{ display: "flex", gap: 9, alignItems: "flex-start" }}>
-              <span style={{ color: "var(--accent)", fontSize: 15, lineHeight: 1.35, flexShrink: 0 }}>•</span>
-              <span style={{ fontSize: 14, lineHeight: 1.45, color: "var(--text)" }}>{t.replace(/^[•-]\s*/, "")}</span>
+            <div key={i} style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <span style={{ color: "var(--accent)", fontSize: 16, lineHeight: 1.3, flexShrink: 0 }}>•</span>
+              <LabeledText text={t.replace(/^[•\-*]\s*/, "")} />
             </div>
           );
         }
-        // "Label : item · item · item" → label + chips (e.g. "ce que Capitaine sait")
+        // "Label : item · item · item" → small label + chips.
         if (t.includes(" · ")) {
           const colon = t.indexOf(":");
           let label = "";
@@ -223,14 +254,18 @@ function GuideText({ text }: { text: string }) {
           const chips = listPart.split("·").map((s) => s.trim()).filter(Boolean);
           return (
             <div key={i}>
-              {label && <div style={{ fontSize: 12.5, color: "var(--muted)", marginBottom: 7 }}>{label}</div>}
+              {label && (
+                <div style={{ fontSize: 12, fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.03em", color: "var(--muted)", marginBottom: 8 }}>
+                  {label}
+                </div>
+              )}
               <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
                 {chips.map((c, j) => (
                   <span
                     key={j}
                     style={{
                       fontSize: 13, background: "var(--accent-soft)", color: "var(--accent-ink)",
-                      padding: "4px 10px", borderRadius: 999, lineHeight: 1.35,
+                      padding: "5px 11px", borderRadius: 999, lineHeight: 1.3, fontWeight: 500,
                     }}
                   >
                     {c}
@@ -240,8 +275,9 @@ function GuideText({ text }: { text: string }) {
             </div>
           );
         }
+        // Plain paragraph (intro / free text).
         return (
-          <div key={i} style={{ fontSize: 14, lineHeight: 1.5, color: "var(--text)" }}>{t}</div>
+          <div key={i} style={{ fontSize: 14, lineHeight: 1.55, color: "var(--muted)" }}>{t}</div>
         );
       })}
     </div>
